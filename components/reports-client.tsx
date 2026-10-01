@@ -127,7 +127,7 @@ export function ReportsClient({
 
   if (!habit) {
     return (
-      <Card className="rounded-2xl border-none bg-surface"><Card.Content className="p-8 text-center">
+      <Card className="rounded-2xl bg-surface"><Card.Content className="p-8 text-center">
         <p className="text-4xl" aria-hidden>○</p>
         <p className="mt-2 font-medium">{t.reports.empty}</p>
       </Card.Content></Card>
@@ -157,7 +157,7 @@ export function ReportsClient({
         </div>
       </FadeIn>
 
-      <Card className="rounded-2xl border-none bg-surface">
+      <Card className="rounded-2xl bg-surface">
         <Card.Content className="p-4">
           <div className="flex items-center justify-between">
             <p className="text-sm font-semibold">{habit.name}</p>
@@ -188,7 +188,7 @@ export function ReportsClient({
         </Card.Content>
       </Card>
 
-      <Card className="rounded-2xl border-none bg-surface">
+      <Card className="rounded-2xl bg-surface">
         <Card.Content className="p-4">
           <div className="mb-3 flex items-center justify-between">
             <Button size="sm" variant="ghost" onPress={() => setYm((p) => p.m === 1 ? { y: p.y - 1, m: 12 } : { y: p.y, m: p.m - 1 })}>‹ {t.reports.prev}</Button>
@@ -264,7 +264,7 @@ export function ReportsClient({
         </Card.Content>
       </Card>
 
-      <Card className="rounded-2xl border-none bg-surface">
+      <Card className="rounded-2xl bg-surface">
         <Card.Content className="p-4">
           <p className="mb-3 text-sm font-semibold">{t.reports.global}</p>
           <div className="flex flex-col gap-2.5">

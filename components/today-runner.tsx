@@ -110,6 +110,19 @@ export function TodayRunner({ habits, categories, logsByHabit, today, startId }:
     });
   }
 
+  function markList(target: Habit, status: "done" | "missed", log?: HabitLog) {
+    const value = target.tracking_mode === "count" ? (status === "done" ? (target.target_count ?? 1) : (log?.count ?? 0)) : undefined;
+    startTransition(async () => {
+      const fd = new FormData();
+      fd.set("date", today);
+      fd.set("status", status);
+      if (value !== undefined) fd.set("count", String(value));
+      await saveLog(target.id, fd);
+      toast.success(t.toasts.logSaved);
+      router.refresh();
+    });
+  }
+
   // teclado ← → y +/- para contador
   useEffect(() => {
     if (!state.isOpen || !current) return;
@@ -138,8 +151,8 @@ export function TodayRunner({ habits, categories, logsByHabit, today, startId }:
           const c = categories.find((x) => x.id === h.category_id);
           const pct = Math.min(100, ((log?.count ?? 0) / (h.target_count ?? 1)) * 100);
           return (
-            <Card key={h.id} className="rounded-2xl border-none bg-surface">
-              <Card.Content className="p-4">
+            <div key={h.id} className="rounded-2xl bg-surface relative group overflow-hidden border border-transparent dark:border-border/10 cursor-pointer transition-colors hover:border-border/40" onClick={() => openChain(h.id)}>
+              <Card.Content className="p-4 relative z-10 pointer-events-none">
                 <div className="flex items-center gap-3">
                   <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl" style={{ backgroundColor: h.color + "40", color: h.color }}>
                     <CategoryIcon icon={c?.icon ?? "other"} size={19} />
@@ -168,21 +181,39 @@ export function TodayRunner({ habits, categories, logsByHabit, today, startId }:
                       )}
                     </p>
                   </div>
-                  {log && (
+                  <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-auto">
                     <Button
-                      isIconOnly
                       size="sm"
                       variant="ghost"
-                      aria-label={t.reports.clear}
-                      onPress={() => unmark(h.id)}
+                      className="text-success hover:bg-success/10"
+                      aria-label={t.habit.completeGoal}
+                      onPress={() => markList(h, "done", log)}
                       isDisabled={pending}
                     >
-                      <RotateCcw size={15} />
+                      <Check size={16} strokeWidth={2.5} />
                     </Button>
-                  )}
-                  <Button size="sm" variant={log ? "secondary" : "primary"} onPress={() => openChain(h.id)}>
-                    {t.today.open}
-                  </Button>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      className="text-danger hover:bg-danger/10"
+                      aria-label={t.habit.failed}
+                      onPress={() => markList(h, "missed", log)}
+                      isDisabled={pending}
+                    >
+                      <X size={16} strokeWidth={2.5} />
+                    </Button>
+                    {log && (
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        aria-label={t.reports.clear}
+                        onPress={() => unmark(h.id)}
+                        isDisabled={pending}
+                      >
+                        <RotateCcw size={15} />
+                      </Button>
+                    )}
+                  </div>
                 </div>
                 {h.tracking_mode === "count" && (
                   <ProgressBar value={pct} className="mt-3">
@@ -192,55 +223,64 @@ export function TodayRunner({ habits, categories, logsByHabit, today, startId }:
                   </ProgressBar>
                 )}
               </Card.Content>
-            </Card>
+            </div>
           );
         })}
       </div>
 
       <Modal state={state}>
-        <Modal.Backdrop className="bg-background/60 backdrop-blur-sm">
+        <Modal.Backdrop className="bg-background/40 backdrop-blur-md">
           <Modal.Container placement="center">
-            <Modal.Dialog className="bg-transparent shadow-none border-none max-w-sm w-full mx-auto p-0">
+            <Modal.Dialog className="bg-transparent  max-w-sm w-full mx-auto p-0">
               {({ close }) => current ? (
               <div className="flex flex-col gap-4 items-center w-full relative">
                 <div className="absolute right-0 top-0 -translate-y-full pb-2 z-50">
                   <Modal.CloseTrigger />
                 </div>
 
-                <div className="w-full relative overflow-visible">
+                <div className="w-full relative overflow-visible" style={{ perspective: 1000 }}>
+                  {/* Precargar tarjeta siguiente detrás */}
+                  {current.next_habit_id && byId.has(current.next_habit_id) && (
+                    <div className="absolute inset-0 w-full z-0 pointer-events-none opacity-50 scale-95 origin-bottom translate-y-4">
+                      <SwipeCardStatic
+                        habit={byId.get(current.next_habit_id)!}
+                        cat={categories.find((c) => c.id === byId.get(current.next_habit_id!)?.category_id)}
+                      />
+                    </div>
+                  )}
+
                   <AnimatePresence mode="popLayout" initial={false} custom={direction}>
                     <motion.div
                       key={current.id}
                       custom={direction}
                       variants={{
                         enter: (dir: number) => ({
-                          x: dir > 0 ? -100 : 100,
+                          x: dir > 0 ? -200 : 200,
                           opacity: 0,
-                          scale: 0.95,
-                          rotate: dir > 0 ? -10 : 10
+                          scale: 0.8,
+                          rotate: dir > 0 ? -15 : 15,
+                          y: 20
                         }),
                         center: {
                           x: 0,
                           opacity: 1,
                           scale: 1,
-                          rotate: 0
+                          rotate: 0,
+                          y: 0,
+                          transition: { type: "spring", stiffness: 300, damping: 25 }
                         },
                         exit: (dir: number) => ({
-                          x: dir > 0 ? 100 : -100,
+                          x: dir > 0 ? 200 : -200,
                           opacity: 0,
-                          scale: 0.95,
-                          rotate: dir > 0 ? 10 : -10
+                          scale: 0.9,
+                          rotate: dir > 0 ? 15 : -15,
+                          transition: { duration: 0.25, ease: "easeOut" }
                         })
                       }}
                       initial="enter"
                       animate="center"
                       exit="exit"
-                      transition={{
-                        x: { type: "spring", stiffness: 300, damping: 30 },
-                        opacity: { duration: 0.2 },
-                        rotate: { type: "spring", stiffness: 300, damping: 30 }
-                      }}
-                      className="w-full"
+                      className="w-full relative z-10"
                     >
                       <SwipeCard
                         current={current}
@@ -262,7 +302,7 @@ export function TodayRunner({ habits, categories, logsByHabit, today, startId }:
                 </div>
 
                 {current.next_habit_id && byId.has(current.next_habit_id) ? (
-                  <p className="mt-2 text-xs text-muted text-center bg-background/50 backdrop-blur rounded-full px-3 py-1">{t.flash.nextUp}: {byId.get(current.next_habit_id)?.name}</p>
+                  <p className="mt-4 text-xs text-muted text-center bg-background/50 backdrop-blur rounded-full px-3 py-1 opacity-0 pointer-events-none">{t.flash.nextUp}: {byId.get(current.next_habit_id)?.name}</p>
                 ) : null}
               </div>
             ) : null}
@@ -288,6 +328,7 @@ function SwipeCard({ current, cat, localCount, bump, pending, onSwipeLeft, onSwi
   const rotate = useTransform(x, [-200, 200], [-10, 10]);
   const opacityLeft = useTransform(x, [-100, -20], [1, 0]);
   const opacityRight = useTransform(x, [20, 100], [0, 1]);
+  const [hoverDir, setHoverDir] = useState<"left" | "right" | null>(null);
 
   return (
     <motion.div
@@ -299,29 +340,53 @@ function SwipeCard({ current, cat, localCount, bump, pending, onSwipeLeft, onSwi
         if (info.offset.x > 120) onSwipeRight();
         else if (info.offset.x < -120) onSwipeLeft();
       }}
-      className="relative flex w-full flex-col items-center gap-4 rounded-2xl border border-border bg-surface p-6 text-center shadow-lg"
+      className="relative flex w-full flex-col items-center gap-4 rounded-2xl border border-border bg-surface p-6 text-center  touch-none"
     >
-      <motion.div style={{ opacity: opacityRight }} className="absolute right-4 top-4 rounded-lg border-2 border-success px-2 py-1 text-xs font-bold uppercase text-success rotate-12 bg-success/10 z-10">
+      <div className="absolute inset-y-0 left-0 w-[20%] z-20 cursor-w-resize" onPointerEnter={() => setHoverDir("left")} onPointerLeave={() => setHoverDir(null)} onClick={() => onSwipeLeft()} />
+      <div className="absolute inset-y-0 right-0 w-[20%] z-20 cursor-e-resize" onPointerEnter={() => setHoverDir("right")} onPointerLeave={() => setHoverDir(null)} onClick={() => onSwipeRight()} />
+
+      <motion.div style={{ opacity: hoverDir === "right" ? 1 : opacityRight }} className="absolute right-4 top-4 rounded-lg border-2 border-success px-2 py-1 text-xs font-bold uppercase text-success rotate-12 bg-success/10 z-10 pointer-events-none transition-opacity">
         {current.type === "avoid" ? t.habit.clean : current.tracking_mode === "count" ? t.habit.completeGoal : t.habit.didIt}
       </motion.div>
-      <motion.div style={{ opacity: opacityLeft }} className="absolute left-4 top-4 rounded-lg border-2 border-danger px-2 py-1 text-xs font-bold uppercase text-danger -rotate-12 bg-danger/10 z-10">
+      <motion.div style={{ opacity: hoverDir === "left" ? 1 : opacityLeft }} className="absolute left-4 top-4 rounded-lg border-2 border-danger px-2 py-1 text-xs font-bold uppercase text-danger -rotate-12 bg-danger/10 z-10 pointer-events-none transition-opacity">
         {current.type === "avoid" ? t.habit.relapsed : t.habit.failed}
       </motion.div>
 
-      <span className="flex h-16 w-16 items-center justify-center rounded-2xl" style={{ backgroundColor: current.color + "40", color: current.color }}>
+      <span className="flex h-16 w-16 items-center justify-center rounded-2xl relative z-10" style={{ backgroundColor: current.color + "40", color: current.color }}>
         <CategoryIcon icon={cat?.icon ?? "other"} size={30} />
       </span>
-      <p className="text-lg font-semibold text-balance">{current.name}</p>
+      <p className="text-lg font-semibold text-balance relative z-10">{current.name}</p>
       {current.tracking_mode === "count" ? (
-        <div className="flex items-center gap-3" aria-live="polite">
+        <div className="flex items-center gap-3 relative z-30" aria-live="polite">
           <Button isIconOnly variant="secondary" aria-label="-1" onPress={() => bump(-1)}><Minus size={18} /></Button>
           <span className="min-w-24 text-2xl font-semibold tabular-nums">{localCount} <span className="text-sm font-normal text-muted">/ {current.target_count} {current.unit ?? ""}</span></span>
           <Button isIconOnly variant="secondary" aria-label="+1" onPress={() => bump(1)}><Plus size={18} /></Button>
         </div>
       ) : (
-        <p className="text-sm text-muted">{current.type === "avoid" ? t.habit.avoidHint : t.habit.buildHint}</p>
+        <p className="text-sm text-muted relative z-10">{current.type === "avoid" ? t.habit.avoidHint : t.habit.buildHint}</p>
       )}
-      {pending && <Spinner size="sm" color="current" />}
+      {pending && <Spinner size="sm" color="current" className="relative z-10" />}
     </motion.div>
+  );
+}
+
+function SwipeCardStatic({ habit, cat }: { habit: Habit; cat?: HabitCategory }) {
+  const { t } = useLang();
+  return (
+    <div className="flex w-full flex-col items-center gap-4 rounded-2xl border border-border bg-surface p-6 text-center ">
+      <span className="flex h-16 w-16 items-center justify-center rounded-2xl" style={{ backgroundColor: habit.color + "40", color: habit.color }}>
+        <CategoryIcon icon={cat?.icon ?? "other"} size={30} />
+      </span>
+      <p className="text-lg font-semibold text-balance">{habit.name}</p>
+      {habit.tracking_mode === "count" ? (
+        <div className="flex items-center gap-3" aria-hidden>
+          <Button isIconOnly variant="secondary" isDisabled><Minus size={18} /></Button>
+          <span className="min-w-24 text-2xl font-semibold tabular-nums text-muted">0 <span className="text-sm font-normal">/ {habit.target_count} {habit.unit ?? ""}</span></span>
+          <Button isIconOnly variant="secondary" isDisabled><Plus size={18} /></Button>
+        </div>
+      ) : (
+        <p className="text-sm text-muted">{habit.type === "avoid" ? t.habit.avoidHint : t.habit.buildHint}</p>
+      )}
+    </div>
   );
 }
