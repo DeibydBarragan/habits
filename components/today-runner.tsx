@@ -132,7 +132,7 @@ export function TodayRunner({ habits, categories, logsByHabit, today, startId }:
           const c = categories.find((x) => x.id === h.category_id);
           const pct = Math.min(100, ((log?.count ?? 0) / (h.target_count ?? 1)) * 100);
           return (
-            <Card key={h.id}>
+            <Card key={h.id} className="rounded-2xl border-none bg-surface">
               <Card.Content className="p-4">
                 <div className="flex items-center gap-3">
                   <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl" style={{ backgroundColor: h.color + "40", color: h.color }}>
