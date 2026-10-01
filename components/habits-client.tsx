@@ -57,7 +57,7 @@ export function HabitsClient({
       </FadeIn>
 
       {habits.length === 0 ? (
-        <Card>
+        <Card className="rounded-2xl border-none bg-surface">
           <Card.Content className="p-8 text-center">
             <p className="text-4xl" aria-hidden>○</p>
             <p className="mt-2 font-medium">{t.habit.emptyTitle}</p>
@@ -70,7 +70,7 @@ export function HabitsClient({
             const cat = categories.find((c) => c.id === h.category_id);
             return (
               <StaggerItem key={h.id}>
-                <Card>
+                <Card className="rounded-2xl border-none bg-surface">
                   <Card.Content className="p-4">
                     <div className="flex items-center gap-3">
                       <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl" style={{ backgroundColor: h.color + "40", color: h.color }}>
@@ -102,7 +102,7 @@ export function HabitsClient({
         </Stagger>
       )}
 
-      <Card>
+      <Card className="rounded-2xl border-none bg-surface">
         <Card.Content className="p-4">
           <div className="flex items-center justify-between">
             <p className="text-sm font-semibold">{t.categories.title}</p>
@@ -134,7 +134,7 @@ export function HabitsClient({
       </Card>
 
       <Modal state={createModal}>
-        <Modal.Backdrop>
+        <Modal.Backdrop className="bg-background/40 backdrop-blur-md">
           <Modal.Container placement="center">
             <Modal.Dialog>
               <Modal.CloseTrigger />
@@ -158,7 +158,7 @@ export function HabitsClient({
       </Modal>
 
       <Modal state={editModal}>
-        <Modal.Backdrop>
+        <Modal.Backdrop className="bg-background/40 backdrop-blur-md">
           <Modal.Container placement="center">
             <Modal.Dialog>
               <Modal.CloseTrigger />
@@ -182,7 +182,7 @@ export function HabitsClient({
       </Modal>
 
       <Modal state={catCreateModal}>
-        <Modal.Backdrop>
+        <Modal.Backdrop className="bg-background/40 backdrop-blur-md">
           <Modal.Container placement="center">
             <Modal.Dialog className="sm:max-w-[360px]">
               <CategoryCreateForm
@@ -199,7 +199,7 @@ export function HabitsClient({
       </Modal>
 
       <Modal state={catEditModal}>
-        <Modal.Backdrop>
+        <Modal.Backdrop className="bg-background/40 backdrop-blur-md">
           <Modal.Container placement="center">
             <Modal.Dialog className="sm:max-w-[360px]">
               {editingCat && (
