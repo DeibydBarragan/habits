@@ -1,24 +1,16 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { Button, Card, Input, Label, Spinner, TextField } from "@heroui/react";
+import { Pencil, User } from "lucide-react";
+import { Button, Card, Input, Label, Modal, Spinner, TextField, toast, useOverlayState } from "@heroui/react";
 import { useLang } from "@/components/language";
 import { updateProfile, resetStreaks, deleteAccount } from "@/actions/account";
 
 export function SettingsClient({ name, email }: { name: string | null; email: string | null }) {
   const { t } = useLang();
-  const [pending, startTransition] = useTransition();
-  const [saved, setSaved] = useState(false);
+  const nameModal = useOverlayState();
   const [confirmReset, setConfirmReset] = useState(false);
   const [delText, setDelText] = useState("");
-
-  function save(fd: FormData) {
-    startTransition(async () => {
-      setSaved(false);
-      const res = await updateProfile(fd);
-      if (!res?.error) setSaved(true);
-    });
-  }
 
   const canDelete = delText.trim().toLowerCase() === t.settings.deletePhrase.toLowerCase();
 
@@ -26,20 +18,30 @@ export function SettingsClient({ name, email }: { name: string | null; email: st
     <div className="flex flex-col gap-4">
       <Card>
         <Card.Content className="p-4">
-          <p className="mb-3 text-sm font-semibold">{t.settings.profile}</p>
-          <form action={save} className="flex flex-col gap-3">
-            <TextField fullWidth name="name" defaultValue={name ?? ""}>
-              <Label>{t.settings.name}</Label>
-              <Input autoComplete="name" spellCheck={false} />
-            </TextField>
-            <p className="text-xs text-muted tabular-nums">{t.settings.email}: {email}</p>
-            {saved && <p aria-live="polite" className="text-sm text-success">{t.settings.saved}</p>}
-            <Button variant="primary" type="submit" isDisabled={pending}>
-              {pending ? <span className="flex items-center gap-2"><Spinner size="sm" color="current" />{t.settings.saving}</span> : t.settings.save}
+          <div className="flex items-center gap-3">
+            <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-accent text-accent-foreground">
+              <User size={18} />
+            </span>
+            <div className="min-w-0 flex-1">
+              <p className="truncate text-[15px] font-semibold">{name ?? "—"}</p>
+              <p className="truncate text-xs text-muted tabular-nums">{email}</p>
+            </div>
+            <Button isIconOnly variant="ghost" size="sm" aria-label={t.categories.edit} onPress={() => nameModal.open()}>
+              <Pencil size={15} />
             </Button>
-          </form>
+          </div>
         </Card.Content>
       </Card>
+
+      <Modal state={nameModal}>
+        <Modal.Backdrop>
+          <Modal.Container placement="center">
+            <Modal.Dialog className="sm:max-w-[360px]">
+              <NameForm key={name ?? ""} current={name ?? ""} onDone={() => nameModal.close()} />
+            </Modal.Dialog>
+          </Modal.Container>
+        </Modal.Backdrop>
+      </Modal>
 
       <Card>
         <Card.Content className="p-4">
@@ -70,5 +72,54 @@ export function SettingsClient({ name, email }: { name: string | null; email: st
         </Card.Content>
       </Card>
     </div>
+  );
+}
+
+function NameForm({ current, onDone }: { current: string; onDone: () => void }) {
+  const { t } = useLang();
+  const [error, setError] = useState<string>();
+  const [pending, startTransition] = useTransition();
+
+  function handle(fd: FormData) {
+    startTransition(async () => {
+      setError(undefined);
+      const res = await updateProfile(fd);
+      if (res?.error) setError(res.error === "needName" ? t.errors.needName : t.errors.saveFail);
+      else {
+        toast.success(t.settings.saved);
+        onDone();
+      }
+    });
+  }
+
+  return (
+    <>
+      <Modal.CloseTrigger />
+      <Modal.Header>
+        <Modal.Heading>{t.settings.profile}</Modal.Heading>
+      </Modal.Header>
+      <Modal.Body>
+        <form action={handle} className="flex flex-col gap-3">
+          <TextField fullWidth isRequired name="name" defaultValue={current} autoFocus>
+            <Label>{t.settings.name}</Label>
+            <Input autoComplete="name" maxLength={40} spellCheck={false} />
+          </TextField>
+          {error && (
+            <p aria-live="polite" className="text-sm text-danger">
+              {error}
+            </p>
+          )}
+          <Button fullWidth variant="primary" type="submit" isDisabled={pending}>
+            {pending ? (
+              <span className="flex items-center gap-2">
+                <Spinner size="sm" color="current" /> {t.settings.saving}
+              </span>
+            ) : (
+              t.settings.save
+            )}
+          </Button>
+        </form>
+      </Modal.Body>
+    </>
   );
 }

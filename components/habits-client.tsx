@@ -1,17 +1,20 @@
 "use client";
 
-import { useState } from "react";
-import { Button, Card, Modal, useOverlayState } from "@heroui/react";
-import { Pencil, Plus, Trash2, X } from "lucide-react";
+import { useState, useTransition } from "react";
+import { Button, Card, Input, Label, Modal, Spinner, TextField, toast, useOverlayState } from "@heroui/react";
+import { Pencil, Plus } from "lucide-react";
 import { useLang } from "@/components/language";
 import { CategoryIcon } from "@/components/category-icon";
-import { HabitForm, CategoryQuickForm } from "@/components/habit-form";
+import { HabitForm } from "@/components/habit-form";
+import { IconPicker } from "@/components/icon-picker";
+import { ColorPicker } from "@/components/color-picker";
+import { DeleteModal } from "@/components/delete-modal";
 import { Stagger, StaggerItem, FadeIn } from "@/components/animated";
 import { StreakBadge } from "@/components/streak-badge";
 import type { Habit, HabitCategory } from "@/lib/types";
 import type { Streak } from "@/lib/streak";
 import { deleteHabit } from "@/actions/habits";
-import { deleteCategory } from "@/actions/categories";
+import { createCategory, updateCategory, deleteCategory } from "@/actions/categories";
 
 export function HabitsClient({
   habits,
@@ -23,11 +26,23 @@ export function HabitsClient({
   streaks: Record<string, Streak>;
 }) {
   const { t } = useLang();
-  const createState = useOverlayState();
+  const createModal = useOverlayState();
+  const editModal = useOverlayState();
+  const catCreateModal = useOverlayState();
+  const catEditModal = useOverlayState();
   const [editing, setEditing] = useState<Habit | null>(null);
-  const [deleting, setDeleting] = useState<Habit | null>(null);
-  const [showCatForm, setShowCatForm] = useState(false);
-  const [catDeleting, setCatDeleting] = useState<HabitCategory | null>(null);
+  const [editingCat, setEditingCat] = useState<HabitCategory | null>(null);
+  const [formKey, setFormKey] = useState(0);
+
+  function openEdit(h: Habit) {
+    setEditing(h);
+    editModal.open();
+  }
+
+  function openCatEdit(c: HabitCategory) {
+    setEditingCat(c);
+    catEditModal.open();
+  }
 
   return (
     <div className="flex flex-col gap-5">
@@ -36,7 +51,7 @@ export function HabitsClient({
           <h1 className="text-2xl font-semibold tracking-tight text-balance">{t.habit.title}</h1>
           <p className="mt-1 text-sm text-muted">{t.habit.subtitle}</p>
         </div>
-        <Button variant="primary" onPress={() => createState.open()}>
+        <Button variant="primary" onPress={() => createModal.open()}>
           <span className="flex items-center gap-1.5"><Plus size={16} />{t.habit.new}</span>
         </Button>
       </FadeIn>
@@ -69,12 +84,15 @@ export function HabitsClient({
                           {streaks[h.id] && <StreakBadge streak={streaks[h.id]} kind={h.type} />}
                         </div>
                       </div>
-                      <Button isIconOnly variant="ghost" size="sm" aria-label={t.categories.edit} onPress={() => setEditing(h)}>
+                      <Button isIconOnly variant="ghost" size="sm" aria-label={t.categories.edit} onPress={() => openEdit(h)}>
                         <Pencil size={15} />
                       </Button>
-                      <Button isIconOnly variant="ghost" size="sm" aria-label={t.del.titleHabit} onPress={() => setDeleting(h)}>
-                        <X size={16} />
-                      </Button>
+                      <DeleteModal
+                        title={t.del.titleHabit}
+                        message={h.name}
+                        ariaLabel={t.del.titleHabit}
+                        onConfirm={async () => { await deleteHabit(h.id); }}
+                      />
                     </div>
                   </Card.Content>
                 </Card>
@@ -88,9 +106,10 @@ export function HabitsClient({
         <Card.Content className="p-4">
           <div className="flex items-center justify-between">
             <p className="text-sm font-semibold">{t.categories.title}</p>
-            <Button size="sm" variant="ghost" onPress={() => setShowCatForm((v) => !v)}>{t.categories.new}</Button>
+            <Button size="sm" variant="ghost" onPress={() => catCreateModal.open()}>
+              <span className="flex items-center gap-1"><Plus size={14} />{t.categories.new}</span>
+            </Button>
           </div>
-          {showCatForm && <div className="mt-3"><CategoryQuickForm onDone={() => setShowCatForm(false)} /></div>}
           <div className="mt-3 flex flex-col gap-1.5">
             {categories.map((c) => (
               <div key={c.id} className="flex items-center gap-2 text-sm">
@@ -98,9 +117,15 @@ export function HabitsClient({
                   <CategoryIcon icon={c.icon} size={15} />
                 </span>
                 <span className="flex-1 truncate">{c.name}</span>
-                <Button isIconOnly variant="ghost" size="sm" aria-label={t.categories.delLabel(c.name)} onPress={() => setCatDeleting(c)}>
-                  <Trash2 size={14} />
+                <Button isIconOnly variant="ghost" size="sm" aria-label={`${t.categories.edit} ${c.name}`} onPress={() => openCatEdit(c)}>
+                  <Pencil size={13} />
                 </Button>
+                <DeleteModal
+                  title={t.del.titleCategory}
+                  message={t.categories.delConfirm(c.name)}
+                  ariaLabel={t.categories.delLabel(c.name)}
+                  onConfirm={async () => { await deleteCategory(c.id); }}
+                />
               </div>
             ))}
             {categories.length === 0 && <p className="text-sm text-muted">{t.categories.empty}</p>}
@@ -108,69 +133,190 @@ export function HabitsClient({
         </Card.Content>
       </Card>
 
-      <Modal state={createState}>
-        <Modal.Backdrop />
-        <Modal.Container placement="center">
-          <Modal.Dialog>
-            {({ close }) => (
-              <div className="flex flex-col gap-4">
-                <Modal.Header><Modal.Heading>{t.habit.new}</Modal.Heading><Modal.CloseTrigger /></Modal.Header>
-                <Modal.Body><HabitForm categories={categories} habits={habits} onDone={() => close()} /></Modal.Body>
-              </div>
-            )}
-          </Modal.Dialog>
-        </Modal.Container>
+      <Modal state={createModal}>
+        <Modal.Backdrop>
+          <Modal.Container placement="center">
+            <Modal.Dialog>
+              <Modal.CloseTrigger />
+              <Modal.Header>
+                <Modal.Heading>{t.habit.new}</Modal.Heading>
+              </Modal.Header>
+              <Modal.Body>
+                <HabitForm
+                  key={formKey}
+                  categories={categories}
+                  habits={habits}
+                  onDone={() => {
+                    createModal.close();
+                    setFormKey((k) => k + 1);
+                  }}
+                />
+              </Modal.Body>
+            </Modal.Dialog>
+          </Modal.Container>
+        </Modal.Backdrop>
       </Modal>
 
-      <Modal state={{ isOpen: !!editing, setOpen: (v: boolean) => { if (!v) setEditing(null); } } as any}>
-        <Modal.Backdrop />
-        <Modal.Container placement="center">
-          <Modal.Dialog>
-            {({ close }) => editing ? (
-              <div className="flex flex-col gap-4">
-                <Modal.Header><Modal.Heading>{t.habit.edit}</Modal.Heading><Modal.CloseTrigger /></Modal.Header>
-                <Modal.Body><HabitForm categories={categories} habits={habits} initial={editing} onDone={() => { setEditing(null); close(); }} /></Modal.Body>
-              </div>
-            ) : null}
-          </Modal.Dialog>
-        </Modal.Container>
+      <Modal state={editModal}>
+        <Modal.Backdrop>
+          <Modal.Container placement="center">
+            <Modal.Dialog>
+              <Modal.CloseTrigger />
+              <Modal.Header>
+                <Modal.Heading>{t.habit.edit}</Modal.Heading>
+              </Modal.Header>
+              <Modal.Body>
+                {editing && (
+                  <HabitForm
+                    key={editing.id}
+                    categories={categories}
+                    habits={habits}
+                    initial={editing}
+                    onDone={() => editModal.close()}
+                  />
+                )}
+              </Modal.Body>
+            </Modal.Dialog>
+          </Modal.Container>
+        </Modal.Backdrop>
       </Modal>
 
-      <Modal state={{ isOpen: !!deleting, setOpen: (v: boolean) => { if (!v) setDeleting(null); } } as any}>
-        <Modal.Backdrop />
-        <Modal.Container placement="center">
-          <Modal.Dialog>
-            {({ close }) => (
-              <div className="flex flex-col gap-4">
-                <Modal.Header><Modal.Heading>{t.del.titleHabit}</Modal.Heading><Modal.CloseTrigger /></Modal.Header>
-                <Modal.Body><p className="text-sm text-muted">{deleting?.name}</p></Modal.Body>
-                <Modal.Footer>
-                  <Button variant="ghost" onPress={() => { setDeleting(null); close(); }}>{t.del.cancel}</Button>
-                  <Button variant="danger" onPress={async () => { if (deleting) await deleteHabit(deleting.id); setDeleting(null); close(); }}>{t.del.confirm}</Button>
-                </Modal.Footer>
-              </div>
-            )}
-          </Modal.Dialog>
-        </Modal.Container>
+      <Modal state={catCreateModal}>
+        <Modal.Backdrop>
+          <Modal.Container placement="center">
+            <Modal.Dialog className="sm:max-w-[360px]">
+              <CategoryCreateForm
+                key={formKey}
+                defaultColor={categories[0]?.color ?? "#64748B"}
+                onDone={() => {
+                  catCreateModal.close();
+                  setFormKey((k) => k + 1);
+                }}
+              />
+            </Modal.Dialog>
+          </Modal.Container>
+        </Modal.Backdrop>
       </Modal>
 
-      <Modal state={{ isOpen: !!catDeleting, setOpen: (v: boolean) => { if (!v) setCatDeleting(null); } } as any}>
-        <Modal.Backdrop />
-        <Modal.Container placement="center">
-          <Modal.Dialog>
-            {({ close }) => (
-              <div className="flex flex-col gap-4">
-                <Modal.Header><Modal.Heading>{t.del.titleCategory}</Modal.Heading><Modal.CloseTrigger /></Modal.Header>
-                <Modal.Body><p className="text-sm text-muted">{catDeleting && t.categories.delConfirm(catDeleting.name)}</p></Modal.Body>
-                <Modal.Footer>
-                  <Button variant="ghost" onPress={() => { setCatDeleting(null); close(); }}>{t.del.cancel}</Button>
-                  <Button variant="danger" onPress={async () => { if (catDeleting) await deleteCategory(catDeleting.id); setCatDeleting(null); close(); }}>{t.del.confirm}</Button>
-                </Modal.Footer>
-              </div>
-            )}
-          </Modal.Dialog>
-        </Modal.Container>
+      <Modal state={catEditModal}>
+        <Modal.Backdrop>
+          <Modal.Container placement="center">
+            <Modal.Dialog className="sm:max-w-[360px]">
+              {editingCat && (
+                <CategoryEditForm
+                  key={editingCat.id}
+                  category={editingCat}
+                  onDone={() => catEditModal.close()}
+                />
+              )}
+            </Modal.Dialog>
+          </Modal.Container>
+        </Modal.Backdrop>
       </Modal>
     </div>
+  );
+}
+
+function CategoryCreateForm({ defaultColor, onDone }: { defaultColor: string; onDone: () => void }) {
+  const { t } = useLang();
+  const [error, setError] = useState<string>();
+  const [pending, startTransition] = useTransition();
+
+  function handle(fd: FormData) {
+    startTransition(async () => {
+      setError(undefined);
+      const res = await createCategory(fd);
+      if (res?.error) setError(res.error === "catExists" ? t.errors.catExists : t.errors.saveFail);
+      else {
+        toast.success(t.toasts.categorySaved);
+        onDone();
+      }
+    });
+  }
+
+  return (
+    <>
+      <Modal.CloseTrigger />
+      <Modal.Header>
+        <Modal.Heading>{t.categories.new}</Modal.Heading>
+      </Modal.Header>
+      <Modal.Body>
+        <form action={handle} className="flex flex-col gap-3">
+          <TextField fullWidth isRequired name="name" autoFocus>
+            <Label>{t.categories.name}</Label>
+            <Input placeholder={t.categories.newPh} maxLength={30} autoComplete="off" spellCheck={false} />
+          </TextField>
+          <IconPicker label={t.categories.icon} />
+          <ColorPicker label={t.habit.color} defaultValue={defaultColor} />
+          {error && (
+            <p aria-live="polite" className="text-sm text-danger">
+              {error}
+            </p>
+          )}
+          <Button fullWidth variant="primary" type="submit" isDisabled={pending}>
+            {pending ? (
+              <span className="flex items-center gap-2">
+                <Spinner size="sm" color="current" /> {t.categories.saving}
+              </span>
+            ) : (
+              t.categories.add
+            )}
+          </Button>
+        </form>
+      </Modal.Body>
+    </>
+  );
+}
+
+function CategoryEditForm({ category, onDone }: { category: HabitCategory; onDone: () => void }) {
+  const { t } = useLang();
+  const [error, setError] = useState<string>();
+  const [pending, startTransition] = useTransition();
+
+  function handle(fd: FormData) {
+    startTransition(async () => {
+      setError(undefined);
+      const res = await updateCategory(category.id, fd);
+      if (res?.error) setError(res.error === "catExists" ? t.errors.catExists : t.errors.saveFail);
+      else {
+        toast.success(t.categories.updated);
+        onDone();
+      }
+    });
+  }
+
+  return (
+    <>
+      <Modal.CloseTrigger />
+      <Modal.Header>
+        <Modal.Heading>
+          {t.categories.edit} “{category.name}”
+        </Modal.Heading>
+      </Modal.Header>
+      <Modal.Body>
+        <form action={handle} className="flex flex-col gap-3">
+          <TextField fullWidth isRequired name="name" defaultValue={category.name} autoFocus>
+            <Label>{t.categories.name}</Label>
+            <Input maxLength={30} autoComplete="off" spellCheck={false} />
+          </TextField>
+          <IconPicker label={t.categories.icon} defaultValue={category.icon} />
+          <ColorPicker label={t.habit.color} defaultValue={category.color} />
+          {error && (
+            <p aria-live="polite" className="text-sm text-danger">
+              {error}
+            </p>
+          )}
+          <Button fullWidth variant="primary" type="submit" isDisabled={pending}>
+            {pending ? (
+              <span className="flex items-center gap-2">
+                <Spinner size="sm" color="current" /> {t.categories.saving}
+              </span>
+            ) : (
+              t.categories.save
+            )}
+          </Button>
+        </form>
+      </Modal.Body>
+    </>
   );
 }

@@ -139,14 +139,14 @@ export function TodayRunner({ habits, categories, logsByHabit, today, startId }:
       </div>
 
       <Modal state={state}>
-        <Modal.Backdrop />
-        <Modal.Container placement="center">
-          <Modal.Dialog>
-            {({ close }) => current ? (
+        <Modal.Backdrop>
+          <Modal.Container placement="center">
+            <Modal.Dialog>
+              {({ close }) => current ? (
               <div className="flex flex-col gap-4">
+                <Modal.CloseTrigger />
                 <Modal.Header>
                   <Modal.Heading>{current.name}</Modal.Heading>
-                  <Modal.CloseTrigger />
                 </Modal.Header>
                 <Modal.Body>
                   <p className="text-xs text-muted">{t.flash.swipeHint}</p>
@@ -197,7 +197,8 @@ export function TodayRunner({ habits, categories, logsByHabit, today, startId }:
               </div>
             ) : null}
           </Modal.Dialog>
-        </Modal.Container>
+          </Modal.Container>
+        </Modal.Backdrop>
       </Modal>
     </>
   );
