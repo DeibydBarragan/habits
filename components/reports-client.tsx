@@ -45,45 +45,47 @@ export function ReportsClient({
   const habit = habits.find((h) => h.id === sel);
   const habitLogs = useMemo(() => logs.filter((l) => l.habit_id === sel), [logs, sel]);
 
-  // tasa 30 días (solo días activos)
-  const rate = useMemo(() => {
-    if (!habit) return { done: 0, total: 0, pct: 0, avg: 0 };
+  // tasa: días activos resueltos desde la creación del hábito (máx 30).
+  // Los días previos a su creación no cuentan; hoy sin registro es pendiente.
+  function resolvedRate(
+    h: Habit,
+    entries: HabitLog[]
+  ): { done: number; total: number; pct: number; avg: number } {
     let done = 0, total = 0, sum = 0, n = 0;
-    const map = new Map(habitLogs.map((l) => [l.date, l]));
+    const map = new Map(entries.map((l) => [l.date, l]));
+    const created = (h.created_at ?? "2000-01-01").slice(0, 10);
     for (let i = 0; i < 30; i++) {
       const d = new Date(today + "T12:00:00");
       d.setDate(d.getDate() - i);
       const iso = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+      if (iso < created) break;
       const js = d.getDay();
       const isoW = js === 0 ? 7 : js;
-      if (!habit.days_active.includes(isoW)) continue;
-      total++;
+      if (!h.days_active.includes(isoW)) continue;
       const l = map.get(iso);
+      if (iso === today && !l) continue; // pendiente hoy
+      total++;
       if (l?.status === "done") {
         done++;
         if (l.count != null) { sum += l.count; n++; }
       }
     }
     return { done, total, pct: total ? Math.round((done / total) * 100) : 0, avg: n ? sum / n : 0 };
+  }
+
+  const rate = useMemo(() => {
+    if (!habit) return { done: 0, total: 0, pct: 0, avg: 0 };
+    return resolvedRate(habit, habitLogs);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [habit, habitLogs, today]);
 
   // global: barras por hábito
   const globalRates = useMemo(() => {
     return habits.map((h) => {
-      const map = new Map(logs.filter((l) => l.habit_id === h.id).map((l) => [l.date, l]));
-      let done = 0, total = 0;
-      for (let i = 0; i < 30; i++) {
-        const d = new Date(today + "T12:00:00");
-        d.setDate(d.getDate() - i);
-        const iso = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
-        const js = d.getDay();
-        const isoW = js === 0 ? 7 : js;
-        if (!h.days_active.includes(isoW)) continue;
-        total++;
-        if (map.get(iso)?.status === "done") done++;
-      }
-      return { habit: h, pct: total ? Math.round((done / total) * 100) : 0 };
+      const r = resolvedRate(h, logs.filter((l) => l.habit_id === h.id));
+      return { habit: h, pct: r.pct, done: r.done, total: r.total };
     });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [habits, logs, today]);
 
   const cells = monthGrid(ym.y, ym.m);
@@ -162,9 +164,13 @@ export function ReportsClient({
             {streaks[habit.id] && <StreakBadge streak={streaks[habit.id]} kind={habit.type} />}
           </div>
           <p className="mt-2 text-xs text-muted tabular-nums">{t.reports.rate30}: {rate.done}/{rate.total} · {rate.pct}%{habit.tracking_mode === "count" && rate.avg ? ` · ${t.reports.avg} ${rate.avg.toFixed(1)}` : ""}</p>
-          {view === "bar" ? (
+          {rate.total === 0 ? (
+            <p className="mt-3 text-sm text-muted">{t.reports.empty}</p>
+          ) : view === "bar" ? (
             <ProgressBar value={rate.pct} className="mt-3">
-              <ProgressBar.Fill style={{ background: habit.color, width: `${rate.pct}%` }} />
+              <ProgressBar.Track>
+                <ProgressBar.Fill style={{ background: habit.color, width: `${rate.pct}%` }} />
+              </ProgressBar.Track>
             </ProgressBar>
           ) : (
             <div className="mt-3 flex items-center gap-4">
@@ -237,7 +243,7 @@ export function ReportsClient({
               );
             })}
           </div>
-          <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1.5 text-xs text-muted" aria-label={t.reports.editDay}>
+          <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1.5 text-xs text-muted">
             <span className="flex items-center gap-1.5">
               <span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: habit.color }} />
               {t.today.done}
@@ -255,7 +261,6 @@ export function ReportsClient({
               {t.habit.restDay}
             </span>
           </div>
-          <p className="mt-2 text-xs text-muted">{t.reports.editDay}: ✓ → ✕ → {t.reports.clear}</p>
         </Card.Content>
       </Card>
 
@@ -263,11 +268,13 @@ export function ReportsClient({
         <Card.Content className="p-4">
           <p className="mb-3 text-sm font-semibold">{t.reports.global}</p>
           <div className="flex flex-col gap-2.5">
-            {globalRates.map(({ habit: h, pct }) => (
+            {globalRates.map(({ habit: h, pct, done, total }) => (
               <div key={h.id}>
-                <div className="mb-1 flex justify-between text-xs"><span className="truncate">{h.name}</span><span className="tabular-nums text-muted">{pct}%</span></div>
+                <div className="mb-1 flex justify-between text-xs"><span className="truncate">{h.name}</span><span className="tabular-nums text-muted">{done}/{total} · {pct}%</span></div>
                 <ProgressBar value={pct}>
-                  <ProgressBar.Fill style={{ background: h.color, width: `${pct}%` }} />
+                  <ProgressBar.Track>
+                    <ProgressBar.Fill style={{ background: h.color, width: `${pct}%` }} />
+                  </ProgressBar.Track>
                 </ProgressBar>
               </div>
             ))}

@@ -1,13 +1,14 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState, useTransition } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from "react";
+import { useRouter } from "next/navigation";
 import { motion } from "framer-motion";
-import { Button, Card, Modal, ProgressBar, Spinner, useOverlayState } from "@heroui/react";
-import { ArrowLeft, ArrowRight, Check, Flame, Minus, Plus, X } from "lucide-react";
+import { Button, Card, Modal, ProgressBar, Spinner, toast, useOverlayState } from "@heroui/react";
+import { ArrowLeft, ArrowRight, Check, Minus, Plus, RotateCcw, X } from "lucide-react";
 import { useLang } from "@/components/language";
 import { CategoryIcon } from "@/components/category-icon";
 import type { Habit, HabitCategory, HabitLog } from "@/lib/types";
-import { saveLog, bumpCount } from "@/actions/logs";
+import { saveLog, bumpCount, clearLog } from "@/actions/logs";
 
 type Props = {
   habits: Habit[];
@@ -19,15 +20,18 @@ type Props = {
 
 export function TodayRunner({ habits, categories, logsByHabit, today, startId }: Props) {
   const { t } = useLang();
+  const router = useRouter();
   const state = useOverlayState();
   const [queue, setQueue] = useState<string[]>([]);
-  const [visited, setVisited] = useState<string[]>([]);
+  const visitedRef = useRef<string[]>([]);
+  const queueRef = useRef<string[]>([]);
   const [pending, startTransition] = useTransition();
 
   const byId = useMemo(() => new Map(habits.map((h) => [h.id, h])), [habits]);
 
   const openChain = useCallback((firstId: string) => {
-    setVisited([]);
+    visitedRef.current = [];
+    queueRef.current = [firstId];
     setQueue([firstId]);
     state.open();
   }, [state]);
@@ -49,33 +53,45 @@ export function TodayRunner({ habits, categories, logsByHabit, today, startId }:
   }, [currentId, prevLog?.count]);
 
   function advance(from: Habit) {
+    visitedRef.current = [...visitedRef.current, from.id];
     const nextId = from.next_habit_id;
-    setVisited((v) => [...v, from.id]);
-    if (nextId && byId.has(nextId) && !visited.includes(nextId) && visited.length < 20) {
+    if (nextId && byId.has(nextId) && !visitedRef.current.includes(nextId) && visitedRef.current.length < 20) {
       const nextLog = logsByHabit.get(nextId)?.get(today);
       if (!nextLog) {
+        queueRef.current = [nextId];
         setQueue([nextId]);
         return;
       }
     }
-    // cerrar o siguiente pendiente de la lista general
-    const rest = queue.slice(1);
+    const rest = queueRef.current.slice(1);
+    queueRef.current = rest;
     if (rest.length) setQueue(rest);
     else {
       setQueue([]);
       state.close();
     }
+    router.refresh();
   }
 
   function mark(status: "done" | "missed", count?: number) {
     if (!current) return;
+    const target = current;
+    const value = target.tracking_mode === "count" ? (count ?? localCount) : undefined;
     startTransition(async () => {
       const fd = new FormData();
       fd.set("date", today);
       fd.set("status", status);
-      if (current.tracking_mode === "count") fd.set("count", String(count ?? localCount));
-      await saveLog(current.id, fd);
-      advance(current);
+      if (value !== undefined) fd.set("count", String(value));
+      await saveLog(target.id, fd);
+      toast.success(t.toasts.logSaved);
+      advance(target);
+    });
+  }
+
+  function unmark(habitId: string) {
+    startTransition(async () => {
+      await clearLog(habitId, today);
+      router.refresh();
     });
   }
 
@@ -85,6 +101,7 @@ export function TodayRunner({ habits, categories, logsByHabit, today, startId }:
     setLocalCount(next);
     startTransition(async () => {
       await bumpCount(current.id, today, d);
+      router.refresh();
     });
   }
 
@@ -108,6 +125,7 @@ export function TodayRunner({ habits, categories, logsByHabit, today, startId }:
         {habits.map((h) => {
           const log = logsByHabit.get(h.id)?.get(today);
           const c = categories.find((x) => x.id === h.category_id);
+          const pct = Math.min(100, ((log?.count ?? 0) / (h.target_count ?? 1)) * 100);
           return (
             <Card key={h.id}>
               <Card.Content className="p-4">
@@ -117,19 +135,49 @@ export function TodayRunner({ habits, categories, logsByHabit, today, startId }:
                   </span>
                   <div className="min-w-0 flex-1">
                     <p className="truncate text-[15px] font-medium">{h.name}</p>
-                    <p className="text-xs text-muted tabular-nums">
-                      {h.tracking_mode === "count"
-                        ? `${log?.count ?? 0} ${t.habit.of} ${h.target_count} ${h.unit ?? ""}`
-                        : log?.status === "done" ? t.today.done : log?.status === "missed" ? t.today.missed : t.habit.pendingToday}
+                    <p className="mt-0.5 flex items-center gap-1.5 text-xs tabular-nums" aria-live="polite">
+                      {log?.status === "done" ? (
+                        <span className="inline-flex items-center gap-1 font-medium text-success">
+                          <Check size={13} strokeWidth={2.5} />
+                          {h.tracking_mode === "count"
+                            ? `${log.count ?? 0} ${t.habit.of} ${h.target_count} ${h.unit ?? ""}`
+                            : h.type === "avoid" ? t.habit.clean : t.today.done}
+                        </span>
+                      ) : log?.status === "missed" ? (
+                        <span className="inline-flex items-center gap-1 font-medium text-danger">
+                          <X size={13} strokeWidth={2.5} />
+                          {h.type === "avoid" ? t.habit.relapsed : t.today.missed}
+                        </span>
+                      ) : (
+                        <span className="text-muted">
+                          {h.tracking_mode === "count"
+                            ? `0 ${t.habit.of} ${h.target_count} ${h.unit ?? ""}`
+                            : t.habit.pendingToday}
+                        </span>
+                      )}
                     </p>
                   </div>
+                  {log && (
+                    <Button
+                      isIconOnly
+                      size="sm"
+                      variant="ghost"
+                      aria-label={t.reports.clear}
+                      onPress={() => unmark(h.id)}
+                      isDisabled={pending}
+                    >
+                      <RotateCcw size={15} />
+                    </Button>
+                  )}
                   <Button size="sm" variant={log ? "secondary" : "primary"} onPress={() => openChain(h.id)}>
                     {t.today.open}
                   </Button>
                 </div>
                 {h.tracking_mode === "count" && (
-                  <ProgressBar value={Math.min(100, ((log?.count ?? 0) / (h.target_count ?? 1)) * 100)} className="mt-3">
-                    <ProgressBar.Fill style={{ background: h.color, width: `${Math.min(100, ((log?.count ?? 0) / (h.target_count ?? 1)) * 100)}%` }} />
+                  <ProgressBar value={pct} className="mt-3">
+                    <ProgressBar.Track>
+                      <ProgressBar.Fill style={{ background: h.color, width: `${pct}%` }} />
+                    </ProgressBar.Track>
                   </ProgressBar>
                 )}
               </Card.Content>
@@ -143,15 +191,13 @@ export function TodayRunner({ habits, categories, logsByHabit, today, startId }:
           <Modal.Container placement="center">
             <Modal.Dialog>
               {({ close }) => current ? (
-              <div className="flex flex-col gap-4">
+              <div className="flex flex-col gap-4" key={current.id}>
                 <Modal.CloseTrigger />
                 <Modal.Header>
                   <Modal.Heading>{current.name}</Modal.Heading>
                 </Modal.Header>
                 <Modal.Body>
-                  <p className="text-xs text-muted">{t.flash.swipeHint}</p>
                   <motion.div
-                    key={current.id}
                     drag="x"
                     dragConstraints={{ left: 0, right: 0 }}
                     dragElastic={0.6}
