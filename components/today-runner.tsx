@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { motion } from "framer-motion";
+import { motion, AnimatePresence } from "framer-motion";
 import { Button, Card, Modal, ProgressBar, Spinner, toast, useOverlayState } from "@heroui/react";
 import { ArrowLeft, ArrowRight, Check, Minus, Plus, RotateCcw, X } from "lucide-react";
 import { useLang } from "@/components/language";
@@ -26,6 +26,7 @@ export function TodayRunner({ habits, categories, logsByHabit, today, startId }:
   const visitedRef = useRef<string[]>([]);
   const queueRef = useRef<string[]>([]);
   const [pending, startTransition] = useTransition();
+  const [direction, setDirection] = useState<number>(0);
 
   const byId = useMemo(() => new Map(habits.map((h) => [h.id, h])), [habits]);
 
@@ -77,6 +78,10 @@ export function TodayRunner({ habits, categories, logsByHabit, today, startId }:
     if (!current) return;
     const target = current;
     const value = target.tracking_mode === "count" ? (count ?? localCount) : undefined;
+
+    // Set direction based on status for animation
+    setDirection(status === "done" ? 1 : -1);
+
     startTransition(async () => {
       const fd = new FormData();
       fd.set("date", today);
@@ -196,34 +201,62 @@ export function TodayRunner({ habits, categories, logsByHabit, today, startId }:
                 <Modal.Header>
                   <Modal.Heading>{current.name}</Modal.Heading>
                 </Modal.Header>
-                <Modal.Body>
-                  <motion.div
-                    drag="x"
-                    dragConstraints={{ left: 0, right: 0 }}
-                    dragElastic={0.6}
-                    onDragEnd={(_, info) => {
-                      if (info.offset.x > 120) mark("done", current.tracking_mode === "count" ? localCount : undefined);
-                      else if (info.offset.x < -120) mark("missed", current.tracking_mode === "count" ? localCount : undefined);
-                    }}
-                    className="flex flex-col items-center gap-4 rounded-2xl border border-border bg-surface p-6 text-center"
-                  >
-                    <span className="flex h-16 w-16 items-center justify-center rounded-2xl" style={{ backgroundColor: current.color + "40", color: current.color }}>
-                      <CategoryIcon icon={cat?.icon ?? "other"} size={30} />
-                    </span>
-                    <p className="text-lg font-semibold text-balance">{current.name}</p>
-                    {current.tracking_mode === "count" ? (
-                      <div className="flex items-center gap-3" aria-live="polite">
-                        <Button isIconOnly variant="secondary" aria-label="-1" onPress={() => bump(-1)}><Minus size={18} /></Button>
-                        <span className="min-w-24 text-2xl font-semibold tabular-nums">{localCount} <span className="text-sm font-normal text-muted">/ {current.target_count} {current.unit ?? ""}</span></span>
-                        <Button isIconOnly variant="secondary" aria-label="+1" onPress={() => bump(1)}><Plus size={18} /></Button>
-                      </div>
-                    ) : (
-                      <p className="text-sm text-muted">{current.type === "avoid" ? t.habit.avoidHint : t.habit.buildHint}</p>
-                    )}
-                    {pending && <Spinner size="sm" color="current" />}
-                  </motion.div>
+                <Modal.Body className="overflow-hidden">
+                  <AnimatePresence mode="popLayout" initial={false} custom={direction}>
+                    <motion.div
+                      key={current.id}
+                      custom={direction}
+                      variants={{
+                        enter: (dir: number) => ({
+                          x: dir > 0 ? -100 : 100,
+                          opacity: 0,
+                          scale: 0.95
+                        }),
+                        center: {
+                          x: 0,
+                          opacity: 1,
+                          scale: 1
+                        },
+                        exit: (dir: number) => ({
+                          x: dir > 0 ? 100 : -100,
+                          opacity: 0,
+                          scale: 0.95
+                        })
+                      }}
+                      initial="enter"
+                      animate="center"
+                      exit="exit"
+                      transition={{
+                        x: { type: "spring", stiffness: 300, damping: 30 },
+                        opacity: { duration: 0.2 }
+                      }}
+                      drag="x"
+                      dragConstraints={{ left: 0, right: 0 }}
+                      dragElastic={0.6}
+                      onDragEnd={(_, info) => {
+                        if (info.offset.x > 120) mark("done", current.tracking_mode === "count" ? localCount : undefined);
+                        else if (info.offset.x < -120) mark("missed", current.tracking_mode === "count" ? localCount : undefined);
+                      }}
+                      className="flex w-full flex-col items-center gap-4 rounded-2xl border border-border bg-surface p-6 text-center"
+                    >
+                      <span className="flex h-16 w-16 items-center justify-center rounded-2xl" style={{ backgroundColor: current.color + "40", color: current.color }}>
+                        <CategoryIcon icon={cat?.icon ?? "other"} size={30} />
+                      </span>
+                      <p className="text-lg font-semibold text-balance">{current.name}</p>
+                      {current.tracking_mode === "count" ? (
+                        <div className="flex items-center gap-3" aria-live="polite">
+                          <Button isIconOnly variant="secondary" aria-label="-1" onPress={() => bump(-1)}><Minus size={18} /></Button>
+                          <span className="min-w-24 text-2xl font-semibold tabular-nums">{localCount} <span className="text-sm font-normal text-muted">/ {current.target_count} {current.unit ?? ""}</span></span>
+                          <Button isIconOnly variant="secondary" aria-label="+1" onPress={() => bump(1)}><Plus size={18} /></Button>
+                        </div>
+                      ) : (
+                        <p className="text-sm text-muted">{current.type === "avoid" ? t.habit.avoidHint : t.habit.buildHint}</p>
+                      )}
+                      {pending && <Spinner size="sm" color="current" />}
+                    </motion.div>
+                  </AnimatePresence>
                   {current.next_habit_id && byId.has(current.next_habit_id) ? (
-                    <p className="text-xs text-muted">{t.flash.nextUp}: {byId.get(current.next_habit_id)?.name}</p>
+                    <p className="mt-4 text-xs text-muted">{t.flash.nextUp}: {byId.get(current.next_habit_id)?.name}</p>
                   ) : null}
                 </Modal.Body>
                 <Modal.Footer>
