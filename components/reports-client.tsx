@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState, useTransition } from "react";
-import { Button, Card, ProgressBar, Select, ListBox, Spinner } from "@heroui/react";
+import { Button, Card, ProgressBar, Select, ListBox, Spinner, Tooltip } from "@heroui/react";
 import { useLang } from "@/components/language";
 import { FadeIn } from "@/components/animated";
 import { StreakBadge } from "@/components/streak-badge";
@@ -34,10 +34,11 @@ export function ReportsClient({
   streaks: Record<string, Streak>;
   today: string;
 }) {
-  const { t } = useLang();
+  const { lang, t } = useLang();
   const [sel, setSel] = useState<string>(habits[0]?.id ?? "");
   const [view, setView] = useState<"bar" | "pie">("bar");
   const [pending, startTransition] = useTransition();
+  const [savingDate, setSavingDate] = useState<string | null>(null);
   const now = new Date(today + "T12:00:00");
   const [ym, setYm] = useState({ y: now.getFullYear(), m: now.getMonth() + 1 });
 
@@ -89,24 +90,36 @@ export function ReportsClient({
   const logMap = useMemo(() => new Map(habitLogs.map((l) => [l.date, l])), [habitLogs]);
 
   function cycleDay(date: string) {
-    if (!habit) return;
+    if (!habit || savingDate === date) return;
     const cur = logMap.get(date)?.status;
+    setSavingDate(date);
     startTransition(async () => {
-      if (!cur) {
-        const fd = new FormData();
-        fd.set("date", date);
-        fd.set("status", "done");
-        if (habit.tracking_mode === "count") fd.set("count", String(habit.target_count ?? 1));
-        await saveLog(habit.id, fd);
-      } else if (cur === "done") {
-        const fd = new FormData();
-        fd.set("date", date);
-        fd.set("status", "missed");
-        if (habit.tracking_mode === "count") fd.set("count", String(logMap.get(date)?.count ?? 0));
-        await saveLog(habit.id, fd);
-      } else {
-        await clearLog(habit.id, date);
+      try {
+        if (!cur) {
+          const fd = new FormData();
+          fd.set("date", date);
+          fd.set("status", "done");
+          if (habit.tracking_mode === "count") fd.set("count", String(habit.target_count ?? 1));
+          await saveLog(habit.id, fd);
+        } else if (cur === "done") {
+          const fd = new FormData();
+          fd.set("date", date);
+          fd.set("status", "missed");
+          if (habit.tracking_mode === "count") fd.set("count", String(logMap.get(date)?.count ?? 0));
+          await saveLog(habit.id, fd);
+        } else {
+          await clearLog(habit.id, date);
+        }
+      } finally {
+        setSavingDate(null);
       }
+    });
+  }
+
+  function dayLabel(date: string): string {
+    return new Date(date + "T12:00:00").toLocaleDateString(lang === "es" ? "es-ES" : "en-US", {
+      day: "numeric",
+      month: "short",
     });
   }
 
@@ -180,23 +193,67 @@ export function ReportsClient({
             {cells.map((date, i) => {
               if (!date) return <span key={i} />;
               const l = logMap.get(date);
-              const active = habit.days_active.includes(new Date(date + "T12:00:00").getDay() === 0 ? 7 : new Date(date + "T12:00:00").getDay());
+              const d = new Date(date + "T12:00:00");
+              const jsDay = d.getDay();
+              const active = habit.days_active.includes(jsDay === 0 ? 7 : jsDay);
               const isToday = date === today;
+              const isSaving = savingDate === date;
+              const status = !active ? "rest" : l?.status === "done" ? "done" : l?.status === "missed" ? "missed" : "none";
+              const statusLabel =
+                status === "done" ? t.today.done
+                : status === "missed" ? t.today.missed
+                : status === "rest" ? t.habit.restDay
+                : t.reports.clear;
+              const dotClass =
+                status === "done" ? ""
+                : status === "missed" ? "bg-danger"
+                : status === "rest" ? "border border-border"
+                : "bg-default";
               return (
-                <button
-                  key={date}
-                  type="button"
-                  disabled={pending}
-                  onClick={() => cycleDay(date)}
-                  title={`${date} · ${l?.status ?? t.reports.clear}`}
-                  aria-label={`${date} ${l?.status ?? t.reports.clear}`}
-                  className={`flex aspect-square items-center justify-center rounded-lg text-[11px] tabular-nums transition ${!active ? "text-muted/40" : l?.status === "done" ? "font-semibold text-white" : l?.status === "missed" ? "bg-danger/15 text-danger" : "bg-default text-muted hover:text-foreground"} ${isToday ? "ring-2 ring-accent" : ""}`}
-                  style={l?.status === "done" ? { backgroundColor: habit.color } : undefined}
-                >
-                  {Number(date.slice(8))}
-                </button>
+                <Tooltip key={date} delay={200}>
+                  <Tooltip.Trigger className="contents">
+                    <button
+                      type="button"
+                      disabled={isSaving}
+                      onClick={() => cycleDay(date)}
+                      aria-label={`${dayLabel(date)}: ${statusLabel}`}
+                      aria-live="polite"
+                      className={`flex aspect-square cursor-pointer items-center justify-center rounded-lg text-[11px] tabular-nums transition ${!active ? "text-muted/40" : l?.status === "done" ? "font-semibold text-white" : l?.status === "missed" ? "bg-danger/15 text-danger" : "bg-default text-muted hover:text-foreground"} ${isToday ? "ring-2 ring-accent" : ""}`}
+                      style={l?.status === "done" ? { backgroundColor: habit.color } : undefined}
+                    >
+                      {isSaving ? <Spinner size="sm" color="current" aria-label={t.reports.editDay} /> : Number(date.slice(8))}
+                    </button>
+                  </Tooltip.Trigger>
+                  <Tooltip.Content>
+                    <span className="flex items-center gap-1.5 text-xs tabular-nums">
+                      <span
+                        className={`h-2.5 w-2.5 rounded-full ${dotClass}`}
+                        style={status === "done" ? { backgroundColor: habit.color } : undefined}
+                      />
+                      {dayLabel(date)} · {statusLabel}
+                    </span>
+                  </Tooltip.Content>
+                </Tooltip>
               );
             })}
+          </div>
+          <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1.5 text-xs text-muted" aria-label={t.reports.editDay}>
+            <span className="flex items-center gap-1.5">
+              <span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: habit.color }} />
+              {t.today.done}
+            </span>
+            <span className="flex items-center gap-1.5">
+              <span className="h-2.5 w-2.5 rounded-full bg-danger" />
+              {t.today.missed}
+            </span>
+            <span className="flex items-center gap-1.5">
+              <span className="h-2.5 w-2.5 rounded-full bg-default" />
+              {t.reports.clear}
+            </span>
+            <span className="flex items-center gap-1.5">
+              <span className="h-2.5 w-2.5 rounded-full border border-border" />
+              {t.habit.restDay}
+            </span>
           </div>
           <p className="mt-2 text-xs text-muted">{t.reports.editDay}: ✓ → ✕ → {t.reports.clear}</p>
         </Card.Content>
