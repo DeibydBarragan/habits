@@ -34,7 +34,7 @@ export function SettingsClient({ name, email }: { name: string | null; email: st
       </Card>
 
       <Modal state={nameModal}>
-        <Modal.Backdrop>
+        <Modal.Backdrop className="bg-background/60 backdrop-blur-sm">
           <Modal.Container placement="center">
             <Modal.Dialog className="sm:max-w-[360px]">
               <NameForm key={name ?? ""} current={name ?? ""} onDone={() => nameModal.close()} />

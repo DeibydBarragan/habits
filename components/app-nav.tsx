@@ -19,7 +19,7 @@ export function AppNav({ name, onSignOut }: { name?: string | null; onSignOut: (
   ];
 
   return (
-    <header className="sticky top-0 z-10 border-b border-border bg-background/85 backdrop-blur">
+    <header className="sticky top-0 z-10 border-b border-border/50 bg-background/70 backdrop-blur-md shadow-sm">
       <div className="mx-auto flex max-w-xl items-center justify-between px-5 py-3">
         <span className="text-sm font-semibold tracking-tight" translate="no">
           habits

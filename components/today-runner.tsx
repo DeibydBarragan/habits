@@ -192,7 +192,7 @@ export function TodayRunner({ habits, categories, logsByHabit, today, startId }:
       </div>
 
       <Modal state={state}>
-        <Modal.Backdrop>
+        <Modal.Backdrop className="bg-background/60 backdrop-blur-sm">
           <Modal.Container placement="center">
             <Modal.Dialog>
               {({ close }) => current ? (

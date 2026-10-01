@@ -134,7 +134,7 @@ export function HabitsClient({
       </Card>
 
       <Modal state={createModal}>
-        <Modal.Backdrop>
+        <Modal.Backdrop className="bg-background/60 backdrop-blur-sm">
           <Modal.Container placement="center">
             <Modal.Dialog>
               <Modal.CloseTrigger />
@@ -158,7 +158,7 @@ export function HabitsClient({
       </Modal>
 
       <Modal state={editModal}>
-        <Modal.Backdrop>
+        <Modal.Backdrop className="bg-background/60 backdrop-blur-sm">
           <Modal.Container placement="center">
             <Modal.Dialog>
               <Modal.CloseTrigger />
@@ -182,7 +182,7 @@ export function HabitsClient({
       </Modal>
 
       <Modal state={catCreateModal}>
-        <Modal.Backdrop>
+        <Modal.Backdrop className="bg-background/60 backdrop-blur-sm">
           <Modal.Container placement="center">
             <Modal.Dialog className="sm:max-w-[360px]">
               <CategoryCreateForm
@@ -199,7 +199,7 @@ export function HabitsClient({
       </Modal>
 
       <Modal state={catEditModal}>
-        <Modal.Backdrop>
+        <Modal.Backdrop className="bg-background/60 backdrop-blur-sm">
           <Modal.Container placement="center">
             <Modal.Dialog className="sm:max-w-[360px]">
               {editingCat && (
