@@ -231,7 +231,7 @@ export function TodayRunner({ habits, categories, logsByHabit, today, startId }:
       <Modal state={state}>
         <Modal.Backdrop className="bg-background/40 backdrop-blur-md">
           <Modal.Container placement="center">
-            <Modal.Dialog className="bg-transparent shadow-none border-none max-w-sm w-full mx-auto p-0">
+            <Modal.Dialog className="bg-transparent  max-w-sm w-full mx-auto p-0">
               {({ close }) => current ? (
               <div className="flex flex-col gap-4 items-center w-full relative">
                 <div className="absolute right-0 top-0 -translate-y-full pb-2 z-50">
@@ -340,7 +340,7 @@ function SwipeCard({ current, cat, localCount, bump, pending, onSwipeLeft, onSwi
         if (info.offset.x > 120) onSwipeRight();
         else if (info.offset.x < -120) onSwipeLeft();
       }}
-      className="relative flex w-full flex-col items-center gap-4 rounded-2xl border border-border bg-surface p-6 text-center shadow-lg touch-none"
+      className="relative flex w-full flex-col items-center gap-4 rounded-2xl border border-border bg-surface p-6 text-center  touch-none"
     >
       <div className="absolute inset-y-0 left-0 w-[20%] z-20 cursor-w-resize" onPointerEnter={() => setHoverDir("left")} onPointerLeave={() => setHoverDir(null)} onClick={() => onSwipeLeft()} />
       <div className="absolute inset-y-0 right-0 w-[20%] z-20 cursor-e-resize" onPointerEnter={() => setHoverDir("right")} onPointerLeave={() => setHoverDir(null)} onClick={() => onSwipeRight()} />
@@ -373,7 +373,7 @@ function SwipeCard({ current, cat, localCount, bump, pending, onSwipeLeft, onSwi
 function SwipeCardStatic({ habit, cat }: { habit: Habit; cat?: HabitCategory }) {
   const { t } = useLang();
   return (
-    <div className="flex w-full flex-col items-center gap-4 rounded-2xl border border-border bg-surface p-6 text-center shadow-md">
+    <div className="flex w-full flex-col items-center gap-4 rounded-2xl border border-border bg-surface p-6 text-center ">
       <span className="flex h-16 w-16 items-center justify-center rounded-2xl" style={{ backgroundColor: habit.color + "40", color: habit.color }}>
         <CategoryIcon icon={cat?.icon ?? "other"} size={30} />
       </span>

@@ -16,7 +16,7 @@ export function SettingsClient({ name, email }: { name: string | null; email: st
 
   return (
     <div className="flex flex-col gap-4">
-      <Card className="rounded-2xl border-none bg-surface">
+      <Card className="rounded-2xl bg-surface">
         <Card.Content className="p-4">
           <div className="flex items-center gap-3">
             <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-accent text-accent-foreground">
@@ -43,7 +43,7 @@ export function SettingsClient({ name, email }: { name: string | null; email: st
         </Modal.Backdrop>
       </Modal>
 
-      <Card className="rounded-2xl border-none bg-surface">
+      <Card className="rounded-2xl bg-surface">
         <Card.Content className="p-4">
           <p className="text-sm font-semibold text-danger">{t.settings.danger}</p>
           {!confirmReset ? (
