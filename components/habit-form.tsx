@@ -83,7 +83,7 @@ export function HabitForm({
               type="button"
               aria-pressed={type === k}
               onClick={() => setType(k)}
-              className={`rounded-xl border px-3 py-2 text-left transition ${type === k ? "border-accent bg-accent/10" : "border-border bg-surface"}`}
+              className={`rounded-2xl border-none px-3 py-2 text-left transition ${type === k ? "border-accent bg-accent/10" : "bg-surface"}`}
             >
               <span className="block text-sm font-semibold">{k === "build" ? t.habit.build : t.habit.avoid}</span>
               <span className="block text-xs text-muted">{k === "build" ? t.habit.buildHint : t.habit.avoidHint}</span>
@@ -164,7 +164,7 @@ export function HabitForm({
               type="button"
               aria-pressed={tracking === k}
               onClick={() => setTracking(k)}
-              className={`rounded-xl border px-3 py-2 text-sm font-medium transition ${tracking === k ? "border-accent bg-accent/10" : "border-border bg-surface"}`}
+              className={`rounded-2xl border-none px-3 py-2 text-sm font-medium transition ${tracking === k ? "border-accent bg-accent/10" : "bg-surface"}`}
             >
               {k === "check" ? t.habit.simple : t.habit.counter}
             </button>

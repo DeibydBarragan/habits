@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { motion, AnimatePresence } from "framer-motion";
+import { motion, AnimatePresence, useMotionValue, useTransform } from "framer-motion";
 import { Button, Card, Modal, ProgressBar, Spinner, toast, useOverlayState } from "@heroui/react";
 import { ArrowLeft, ArrowRight, Check, Minus, Plus, RotateCcw, X } from "lucide-react";
 import { useLang } from "@/components/language";
@@ -115,7 +115,13 @@ export function TodayRunner({ habits, categories, logsByHabit, today, startId }:
     if (!state.isOpen || !current) return;
     const cur: Habit = current;
     function onKey(e: KeyboardEvent) {
-      if (e.key === "ArrowRight") mark("done", cur.tracking_mode === "count" ? localCount : undefined);
+      if (e.key === "ArrowRight") {
+        if (cur.tracking_mode === "count" && localCount < (cur.target_count ?? 1)) {
+          mark("done", cur.target_count ?? localCount);
+        } else {
+          mark("done", cur.tracking_mode === "count" ? localCount : undefined);
+        }
+      }
       else if (e.key === "ArrowLeft") mark("missed", cur.tracking_mode === "count" ? localCount : undefined);
       else if (cur.tracking_mode === "count" && e.key === "ArrowUp") bump(1);
       else if (cur.tracking_mode === "count" && e.key === "ArrowDown") bump(-1);
@@ -132,7 +138,7 @@ export function TodayRunner({ habits, categories, logsByHabit, today, startId }:
           const c = categories.find((x) => x.id === h.category_id);
           const pct = Math.min(100, ((log?.count ?? 0) / (h.target_count ?? 1)) * 100);
           return (
-            <Card key={h.id}>
+            <Card key={h.id} className="rounded-2xl border-none bg-surface">
               <Card.Content className="p-4">
                 <div className="flex items-center gap-3">
                   <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl" style={{ backgroundColor: h.color + "40", color: h.color }}>
@@ -192,16 +198,16 @@ export function TodayRunner({ habits, categories, logsByHabit, today, startId }:
       </div>
 
       <Modal state={state}>
-        <Modal.Backdrop>
+        <Modal.Backdrop className="bg-background/60 backdrop-blur-sm">
           <Modal.Container placement="center">
-            <Modal.Dialog>
+            <Modal.Dialog className="bg-transparent shadow-none border-none max-w-sm w-full mx-auto p-0">
               {({ close }) => current ? (
-              <div className="flex flex-col gap-4" key={current.id}>
-                <Modal.CloseTrigger />
-                <Modal.Header>
-                  <Modal.Heading>{current.name}</Modal.Heading>
-                </Modal.Header>
-                <Modal.Body className="overflow-hidden">
+              <div className="flex flex-col gap-4 items-center w-full relative">
+                <div className="absolute right-0 top-0 -translate-y-full pb-2 z-50">
+                  <Modal.CloseTrigger />
+                </div>
+
+                <div className="w-full relative overflow-visible">
                   <AnimatePresence mode="popLayout" initial={false} custom={direction}>
                     <motion.div
                       key={current.id}
@@ -210,17 +216,20 @@ export function TodayRunner({ habits, categories, logsByHabit, today, startId }:
                         enter: (dir: number) => ({
                           x: dir > 0 ? -100 : 100,
                           opacity: 0,
-                          scale: 0.95
+                          scale: 0.95,
+                          rotate: dir > 0 ? -10 : 10
                         }),
                         center: {
                           x: 0,
                           opacity: 1,
-                          scale: 1
+                          scale: 1,
+                          rotate: 0
                         },
                         exit: (dir: number) => ({
                           x: dir > 0 ? 100 : -100,
                           opacity: 0,
-                          scale: 0.95
+                          scale: 0.95,
+                          rotate: dir > 0 ? 10 : -10
                         })
                       }}
                       initial="enter"
@@ -228,51 +237,33 @@ export function TodayRunner({ habits, categories, logsByHabit, today, startId }:
                       exit="exit"
                       transition={{
                         x: { type: "spring", stiffness: 300, damping: 30 },
-                        opacity: { duration: 0.2 }
+                        opacity: { duration: 0.2 },
+                        rotate: { type: "spring", stiffness: 300, damping: 30 }
                       }}
-                      drag="x"
-                      dragConstraints={{ left: 0, right: 0 }}
-                      dragElastic={0.6}
-                      onDragEnd={(_, info) => {
-                        if (info.offset.x > 120) mark("done", current.tracking_mode === "count" ? localCount : undefined);
-                        else if (info.offset.x < -120) mark("missed", current.tracking_mode === "count" ? localCount : undefined);
-                      }}
-                      className="flex w-full flex-col items-center gap-4 rounded-2xl border border-border bg-surface p-6 text-center"
+                      className="w-full"
                     >
-                      <span className="flex h-16 w-16 items-center justify-center rounded-2xl" style={{ backgroundColor: current.color + "40", color: current.color }}>
-                        <CategoryIcon icon={cat?.icon ?? "other"} size={30} />
-                      </span>
-                      <p className="text-lg font-semibold text-balance">{current.name}</p>
-                      {current.tracking_mode === "count" ? (
-                        <div className="flex items-center gap-3" aria-live="polite">
-                          <Button isIconOnly variant="secondary" aria-label="-1" onPress={() => bump(-1)}><Minus size={18} /></Button>
-                          <span className="min-w-24 text-2xl font-semibold tabular-nums">{localCount} <span className="text-sm font-normal text-muted">/ {current.target_count} {current.unit ?? ""}</span></span>
-                          <Button isIconOnly variant="secondary" aria-label="+1" onPress={() => bump(1)}><Plus size={18} /></Button>
-                        </div>
-                      ) : (
-                        <p className="text-sm text-muted">{current.type === "avoid" ? t.habit.avoidHint : t.habit.buildHint}</p>
-                      )}
-                      {pending && <Spinner size="sm" color="current" />}
+                      <SwipeCard
+                        current={current}
+                        cat={cat}
+                        localCount={localCount}
+                        bump={bump}
+                        pending={pending}
+                        onSwipeRight={() => {
+                          if (current.tracking_mode === "count" && localCount < (current.target_count ?? 1)) {
+                            mark("done", current.target_count ?? localCount);
+                          } else {
+                            mark("done", current.tracking_mode === "count" ? localCount : undefined);
+                          }
+                        }}
+                        onSwipeLeft={() => mark("missed", current.tracking_mode === "count" ? localCount : undefined)}
+                      />
                     </motion.div>
                   </AnimatePresence>
-                  {current.next_habit_id && byId.has(current.next_habit_id) ? (
-                    <p className="mt-4 text-xs text-muted">{t.flash.nextUp}: {byId.get(current.next_habit_id)?.name}</p>
-                  ) : null}
-                </Modal.Body>
-                <Modal.Footer>
-                  <div className="grid w-full grid-cols-2 gap-2">
-                    <Button variant="danger-soft" isDisabled={pending} onPress={() => mark("missed", current.tracking_mode === "count" ? localCount : undefined)}>
-                      <span className="flex items-center gap-1.5"><ArrowLeft size={16} />{current.type === "avoid" ? t.habit.relapsed : t.habit.failed}</span>
-                    </Button>
-                    <Button variant="primary" isDisabled={pending} onPress={() => {
-                      if (current.tracking_mode === "count" && localCount < (current.target_count ?? 1)) {
-                        mark("done", current.target_count ?? localCount);
-                      } else mark("done", current.tracking_mode === "count" ? localCount : undefined);
-                    }}>
-                      <span className="flex items-center gap-1.5">{current.type === "avoid" ? t.habit.clean : current.tracking_mode === "count" ? t.habit.completeGoal : t.habit.didIt}<ArrowRight size={16} /></span>
-                    </Button>
-                  </div>
-                </Modal.Footer>
+                </div>
+
+                {current.next_habit_id && byId.has(current.next_habit_id) ? (
+                  <p className="mt-2 text-xs text-muted text-center bg-background/50 backdrop-blur rounded-full px-3 py-1">{t.flash.nextUp}: {byId.get(current.next_habit_id)?.name}</p>
+                ) : null}
               </div>
             ) : null}
           </Modal.Dialog>
@@ -280,5 +271,57 @@ export function TodayRunner({ habits, categories, logsByHabit, today, startId }:
         </Modal.Backdrop>
       </Modal>
     </>
+  );
+}
+
+function SwipeCard({ current, cat, localCount, bump, pending, onSwipeLeft, onSwipeRight }: {
+  current: Habit;
+  cat?: HabitCategory;
+  localCount: number;
+  bump: (d: number) => void;
+  pending: boolean;
+  onSwipeLeft: () => void;
+  onSwipeRight: () => void;
+}) {
+  const { t } = useLang();
+  const x = useMotionValue(0);
+  const rotate = useTransform(x, [-200, 200], [-10, 10]);
+  const opacityLeft = useTransform(x, [-100, -20], [1, 0]);
+  const opacityRight = useTransform(x, [20, 100], [0, 1]);
+
+  return (
+    <motion.div
+      style={{ x, rotate }}
+      drag="x"
+      dragConstraints={{ left: 0, right: 0 }}
+      dragElastic={0.8}
+      onDragEnd={(_, info) => {
+        if (info.offset.x > 120) onSwipeRight();
+        else if (info.offset.x < -120) onSwipeLeft();
+      }}
+      className="relative flex w-full flex-col items-center gap-4 rounded-2xl border border-border bg-surface p-6 text-center shadow-lg"
+    >
+      <motion.div style={{ opacity: opacityRight }} className="absolute right-4 top-4 rounded-lg border-2 border-success px-2 py-1 text-xs font-bold uppercase text-success rotate-12 bg-success/10 z-10">
+        {current.type === "avoid" ? t.habit.clean : current.tracking_mode === "count" ? t.habit.completeGoal : t.habit.didIt}
+      </motion.div>
+      <motion.div style={{ opacity: opacityLeft }} className="absolute left-4 top-4 rounded-lg border-2 border-danger px-2 py-1 text-xs font-bold uppercase text-danger -rotate-12 bg-danger/10 z-10">
+        {current.type === "avoid" ? t.habit.relapsed : t.habit.failed}
+      </motion.div>
+
+      <span className="flex h-16 w-16 items-center justify-center rounded-2xl" style={{ backgroundColor: current.color + "40", color: current.color }}>
+        <CategoryIcon icon={cat?.icon ?? "other"} size={30} />
+      </span>
+      <p className="text-lg font-semibold text-balance">{current.name}</p>
+      {current.tracking_mode === "count" ? (
+        <div className="flex items-center gap-3" aria-live="polite">
+          <Button isIconOnly variant="secondary" aria-label="-1" onPress={() => bump(-1)}><Minus size={18} /></Button>
+          <span className="min-w-24 text-2xl font-semibold tabular-nums">{localCount} <span className="text-sm font-normal text-muted">/ {current.target_count} {current.unit ?? ""}</span></span>
+          <Button isIconOnly variant="secondary" aria-label="+1" onPress={() => bump(1)}><Plus size={18} /></Button>
+        </div>
+      ) : (
+        <p className="text-sm text-muted">{current.type === "avoid" ? t.habit.avoidHint : t.habit.buildHint}</p>
+      )}
+      {pending && <Spinner size="sm" color="current" />}
+    </motion.div>
   );
 }

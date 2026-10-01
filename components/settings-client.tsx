@@ -16,7 +16,7 @@ export function SettingsClient({ name, email }: { name: string | null; email: st
 
   return (
     <div className="flex flex-col gap-4">
-      <Card>
+      <Card className="rounded-2xl border-none bg-surface">
         <Card.Content className="p-4">
           <div className="flex items-center gap-3">
             <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-accent text-accent-foreground">
@@ -34,7 +34,7 @@ export function SettingsClient({ name, email }: { name: string | null; email: st
       </Card>
 
       <Modal state={nameModal}>
-        <Modal.Backdrop>
+        <Modal.Backdrop className="bg-background/60 backdrop-blur-sm">
           <Modal.Container placement="center">
             <Modal.Dialog className="sm:max-w-[360px]">
               <NameForm key={name ?? ""} current={name ?? ""} onDone={() => nameModal.close()} />
@@ -43,7 +43,7 @@ export function SettingsClient({ name, email }: { name: string | null; email: st
         </Modal.Backdrop>
       </Modal>
 
-      <Card>
+      <Card className="rounded-2xl border-none bg-surface">
         <Card.Content className="p-4">
           <p className="text-sm font-semibold text-danger">{t.settings.danger}</p>
           {!confirmReset ? (
