@@ -7,7 +7,7 @@ import { computeHabitStreak } from "@/lib/streak";
 import { toLocalISODate } from "@/lib/types";
 
 export default async function HabitosPage() {
-  const { lang, t } = await getDictionary();
+  const { lang } = await getDictionary();
   const { user, profile } = await getUserAndProfile();
   if (!user) redirect("/login");
   const { habits, categories, byHabit } = await getHabitsData();
@@ -22,7 +22,7 @@ export default async function HabitosPage() {
   }
 
   return (
-    <AppShell lang={lang} t={t} name={profile?.name}>
+    <AppShell lang={lang} name={profile?.name}>
       <HabitsClient habits={habits} categories={categories} streaks={streaks} />
     </AppShell>
   );
