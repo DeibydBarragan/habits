@@ -206,11 +206,13 @@ export function HabitForm({
 
       {error && <p aria-live="polite" className="text-sm text-danger">{error}</p>}
 
-      <Button variant="primary" type="submit" isDisabled={pending || days.length === 0}>
-        {pending ? (
-          <span className="flex items-center gap-2"><Spinner size="sm" color="current" />{t.habit.saving}</span>
-        ) : initial ? t.habit.update : t.habit.create}
-      </Button>
+      <div className="flex justify-end">
+        <Button variant="primary" type="submit" isDisabled={pending || days.length === 0}>
+          {pending ? (
+            <span className="flex items-center gap-2"><Spinner size="sm" color="current" />{t.habit.saving}</span>
+          ) : initial ? t.habit.update : t.habit.create}
+        </Button>
+      </div>
     </form>
   );
 }
