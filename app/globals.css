@@ -1,0 +1,26 @@
+@import "tailwindcss";
+@import "@heroui/styles";
+
+@theme {
+  --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
+}
+
+/* Acento esmeralda sobre el tema default de HeroUI (identidad propia vs índigo de expenses) */
+:root {
+  --accent: #059669;
+  --accent-foreground: #ffffff;
+}
+
+.dark {
+  --accent: #34d399;
+  --accent-foreground: #052e22;
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+}
