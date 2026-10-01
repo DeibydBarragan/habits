@@ -28,18 +28,21 @@ body {
 .bg-surface {
   background-color: var(--background);
   border-radius: 1rem;
-  box-shadow: 0 1px 3px 0 rgb(0 0 0 / 0.1), 0 1px 2px -1px rgb(0 0 0 / 0.1);
+  border: 1px solid var(--border);
+  box-shadow: none;
   transition: all 0.2s ease-in-out;
 }
 
 .dark .bg-surface {
-  box-shadow: 0 1px 3px 0 rgb(0 0 0 / 0.5), 0 1px 2px -1px rgb(0 0 0 / 0.3);
+  border-color: rgba(255, 255, 255, 0.1);
+  box-shadow: none;
 }
 
 .bg-surface:hover {
-  box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
+  box-shadow: none;
 }
 
 .dark .bg-surface:hover {
-  box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.5), 0 2px 4px -2px rgb(0 0 0 / 0.3);
+  box-shadow: none;
+  border-color: rgba(255, 255, 255, 0.2);
 }

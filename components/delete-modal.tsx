@@ -25,7 +25,7 @@ export function DeleteModal({
       <Button variant="ghost" size="sm" isIconOnly aria-label={ariaLabel}>
         <X size={16} />
       </Button>
-      <Modal.Backdrop className="bg-background/60 backdrop-blur-sm">
+      <Modal.Backdrop className="bg-background/40 backdrop-blur-md">
         <Modal.Container placement="center">
           <Modal.Dialog className="sm:max-w-[340px]">
             {({ close }) => {
