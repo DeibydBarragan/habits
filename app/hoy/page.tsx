@@ -17,7 +17,11 @@ export default async function HoyPage({ searchParams }: { searchParams?: Promise
   const sp = await searchParams;
 
   return (
-    <AppShell lang={lang} name={profile?.name}>
+    <AppShell
+      lang={lang}
+      name={profile?.name}
+      className="max-w-xl md:max-w-4xl lg:max-w-6xl xl:max-w-7xl 2xl:max-w-[1536px]"
+    >
       <FadeIn>
         <h1 className="text-2xl font-semibold tracking-tight text-balance">{t.today.title}</h1>
         <p className="mt-1 text-sm text-muted">{pending.length ? t.today.subtitle : t.today.allDone}</p>

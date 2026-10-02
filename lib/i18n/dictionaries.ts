@@ -55,9 +55,9 @@ const es = {
     choose: "Elegir…",
     type: "Tipo",
     build: "Construir",
-    buildHint: "El éxito es hacerlo.",
+    buildHint: "Crear un hábito positivo",
     avoid: "Evitar",
-    avoidHint: "El éxito es no caer.",
+    avoidHint: "Eliminar un hábito indeseado",
     color: "Color",
     colorHint: "Se propone el de la categoría, puedes cambiarlo.",
     days: "Días activos",
@@ -190,7 +190,17 @@ const es = {
   },
   langToggle: "Change to English",
   themeToggle: { toLight: "Switch to light mode", toDark: "Switch to dark mode" },
-  chart: { bar: "Bars", pie: "Pie", barLabel: "Bar chart view", pieLabel: "Pie chart view" },
+  chart: { bar: "Barras", pie: "Torta", barLabel: "Ver como barras", pieLabel: "Ver como torta" },
+  views: {
+    list: "Vista de lista",
+    chain: "Camino de hábitos",
+    locked: "Bloqueado",
+    lockedHint: "Completa el hábito anterior para desbloquear",
+    chainCompleted: "¡Cadena completada!",
+    standaloneTitle: "Hábitos individuales",
+    showTrack: "Mostrar",
+    hideTrack: "Ocultar",
+  },
 };
 
 export type Dictionary = typeof es;
@@ -249,9 +259,9 @@ const en: Dictionary = {
     choose: "Choose…",
     type: "Type",
     build: "Build",
-    buildHint: "Success is doing it.",
+    buildHint: "Build a positive habit",
     avoid: "Avoid",
-    avoidHint: "Success is not slipping.",
+    avoidHint: "Break an unwanted habit",
     color: "Color",
     colorHint: "Defaults to the category, you can change it.",
     days: "Active days",
@@ -384,7 +394,17 @@ const en: Dictionary = {
   },
   langToggle: "Cambiar a español",
   themeToggle: { toLight: "Cambiar a modo claro", toDark: "Cambiar a modo oscuro" },
-  chart: { bar: "Barras", pie: "Torta", barLabel: "Ver como barras", pieLabel: "Ver como torta" },
+  chart: { bar: "Bars", pie: "Pie", barLabel: "Bar chart view", pieLabel: "Pie chart view" },
+  views: {
+    list: "List view",
+    chain: "Habit pathway",
+    locked: "Locked",
+    lockedHint: "Complete previous habit to unlock",
+    chainCompleted: "Chain completed!",
+    standaloneTitle: "Standalone habits",
+    showTrack: "Show",
+    hideTrack: "Hide",
+  },
 };
 
 export const dictionaries: Record<Lang, Dictionary> = { es, en };

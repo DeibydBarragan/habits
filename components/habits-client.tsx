@@ -56,82 +56,98 @@ export function HabitsClient({
         </Button>
       </FadeIn>
 
-      {habits.length === 0 ? (
-        <Card className="rounded-2xl bg-surface">
-          <Card.Content className="p-8 text-center">
-            <p className="text-4xl" aria-hidden>○</p>
-            <p className="mt-2 font-medium">{t.habit.emptyTitle}</p>
-            <p className="mt-1 text-sm text-muted">{t.habit.emptySub}</p>
-          </Card.Content>
-        </Card>
-      ) : (
-        <Stagger key={habits.map((h) => h.id).join(",")} className="flex flex-col gap-2">
-          {habits.map((h) => {
-            const cat = categories.find((c) => c.id === h.category_id);
-            return (
-              <StaggerItem key={h.id}>
-                <Card className="rounded-2xl bg-surface">
-                  <Card.Content className="p-4">
-                    <div className="flex items-center gap-3">
-                      <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl" style={{ backgroundColor: h.color + "40", color: h.color }}>
-                        <CategoryIcon icon={cat?.icon ?? "other"} size={19} />
-                      </span>
-                      <div className="min-w-0 flex-1">
-                        <p className="truncate text-[15px] font-medium">{h.name}</p>
-                        <div className="mt-0.5 flex flex-wrap items-center gap-2">
-                          <span className="text-xs text-muted">{h.type === "build" ? t.habit.build : t.habit.avoid}</span>
-                          {h.tracking_mode === "count" && <span className="text-xs text-muted tabular-nums">· {t.habit.counter} {h.target_count}{h.unit ? ` ${h.unit}` : ""}</span>}
-                          {streaks[h.id] && <StreakBadge streak={streaks[h.id]} kind={h.type} />}
+      <div className="flex flex-col lg:flex-row gap-6 items-start w-full">
+        {/* Main Habits List (Responsive 1/2/3 columns with comfortable card sizes) */}
+        <div className="flex-1 min-w-0 flex flex-col gap-3 w-full">
+          {habits.length === 0 ? (
+            <Card className="rounded-2xl bg-surface">
+              <Card.Content className="p-8 text-center">
+                <p className="text-4xl" aria-hidden>○</p>
+                <p className="mt-2 font-medium">{t.habit.emptyTitle}</p>
+                <p className="mt-1 text-sm text-muted">{t.habit.emptySub}</p>
+              </Card.Content>
+            </Card>
+          ) : (
+            <Stagger key={habits.map((h) => h.id).join(",")} className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3.5">
+              {habits.map((h) => {
+                const cat = categories.find((c) => c.id === h.category_id);
+                return (
+                  <StaggerItem key={h.id} className="h-full">
+                    <Card className="rounded-2xl bg-surface h-full border border-border/50">
+                      <Card.Content className="p-4 flex flex-col justify-between h-full">
+                        <div className="flex items-start gap-3">
+                          <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl" style={{ backgroundColor: h.color + "40", color: h.color }}>
+                            <CategoryIcon icon={cat?.icon ?? "other"} size={19} />
+                          </span>
+                          <div className="min-w-0 flex-1">
+                            <p className="truncate text-[15px] font-semibold">{h.name}</p>
+                            <div className="mt-1 flex flex-wrap items-center gap-1.5">
+                              <span className="text-xs text-muted">{h.type === "build" ? t.habit.build : t.habit.avoid}</span>
+                              {h.tracking_mode === "count" && (
+                                <span className="text-xs text-muted tabular-nums">· {t.habit.counter} {h.target_count}{h.unit ? ` ${h.unit}` : ""}</span>
+                              )}
+                            </div>
+                            {streaks[h.id] && (
+                              <div className="mt-2">
+                                <StreakBadge streak={streaks[h.id]} kind={h.type} />
+                              </div>
+                            )}
+                          </div>
+                          <div className="flex items-center gap-1 shrink-0">
+                            <Button isIconOnly variant="ghost" size="sm" aria-label={t.categories.edit} onPress={() => openEdit(h)}>
+                              <Pencil size={15} />
+                            </Button>
+                            <DeleteModal
+                              title={t.del.titleHabit}
+                              message={h.name}
+                              ariaLabel={t.del.titleHabit}
+                              onConfirm={async () => { await deleteHabit(h.id); }}
+                            />
+                          </div>
                         </div>
-                      </div>
-                      <Button isIconOnly variant="ghost" size="sm" aria-label={t.categories.edit} onPress={() => openEdit(h)}>
-                        <Pencil size={15} />
-                      </Button>
-                      <DeleteModal
-                        title={t.del.titleHabit}
-                        message={h.name}
-                        ariaLabel={t.del.titleHabit}
-                        onConfirm={async () => { await deleteHabit(h.id); }}
-                      />
-                    </div>
-                  </Card.Content>
-                </Card>
-              </StaggerItem>
-            );
-          })}
-        </Stagger>
-      )}
+                      </Card.Content>
+                    </Card>
+                  </StaggerItem>
+                );
+              })}
+            </Stagger>
+          )}
+        </div>
 
-      <Card className="rounded-2xl bg-surface">
-        <Card.Content className="p-4">
-          <div className="flex items-center justify-between">
-            <p className="text-sm font-semibold">{t.categories.title}</p>
-            <Button size="sm" variant="ghost" onPress={() => catCreateModal.open()}>
-              <span className="flex items-center gap-1"><Plus size={14} />{t.categories.new}</span>
-            </Button>
-          </div>
-          <div className="mt-3 flex flex-col gap-1.5">
-            {categories.map((c) => (
-              <div key={c.id} className="flex items-center gap-2 text-sm">
-                <span className="flex h-7 w-7 items-center justify-center rounded-lg" style={{ backgroundColor: c.color + "40", color: c.color }}>
-                  <CategoryIcon icon={c.icon} size={15} />
-                </span>
-                <span className="flex-1 truncate">{c.name}</span>
-                <Button isIconOnly variant="ghost" size="sm" aria-label={`${t.categories.edit} ${c.name}`} onPress={() => openCatEdit(c)}>
-                  <Pencil size={13} />
+        {/* Sidebar: Categories Management (Fixed comfortable width) */}
+        <div className="w-full lg:w-72 xl:w-80 shrink-0 lg:sticky lg:top-24">
+          <Card className="rounded-2xl bg-surface border border-border/50">
+            <Card.Content className="p-4 sm:p-5">
+              <div className="flex items-center justify-between">
+                <p className="text-sm font-semibold">{t.categories.title}</p>
+                <Button size="sm" variant="ghost" onPress={() => catCreateModal.open()}>
+                  <span className="flex items-center gap-1"><Plus size={14} />{t.categories.new}</span>
                 </Button>
-                <DeleteModal
-                  title={t.del.titleCategory}
-                  message={t.categories.delConfirm(c.name)}
-                  ariaLabel={t.categories.delLabel(c.name)}
-                  onConfirm={async () => { await deleteCategory(c.id); }}
-                />
               </div>
-            ))}
-            {categories.length === 0 && <p className="text-sm text-muted">{t.categories.empty}</p>}
-          </div>
-        </Card.Content>
-      </Card>
+              <div className="mt-3 flex flex-col gap-1.5">
+                {categories.map((c) => (
+                  <div key={c.id} className="flex items-center gap-2 text-sm p-1.5 rounded-xl hover:bg-default/10 transition-colors">
+                    <span className="flex h-7 w-7 items-center justify-center rounded-lg" style={{ backgroundColor: c.color + "40", color: c.color }}>
+                      <CategoryIcon icon={c.icon} size={15} />
+                    </span>
+                    <span className="flex-1 truncate font-medium">{c.name}</span>
+                    <Button isIconOnly variant="ghost" size="sm" aria-label={`${t.categories.edit} ${c.name}`} onPress={() => openCatEdit(c)}>
+                      <Pencil size={13} />
+                    </Button>
+                    <DeleteModal
+                      title={t.del.titleCategory}
+                      message={t.categories.delConfirm(c.name)}
+                      ariaLabel={t.categories.delLabel(c.name)}
+                      onConfirm={async () => { await deleteCategory(c.id); }}
+                    />
+                  </div>
+                ))}
+                {categories.length === 0 && <p className="text-sm text-muted">{t.categories.empty}</p>}
+              </div>
+            </Card.Content>
+          </Card>
+        </div>
+      </div>
 
       <Modal state={createModal}>
         <Modal.Backdrop className="bg-background/40 backdrop-blur-md">
