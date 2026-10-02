@@ -14,11 +14,34 @@ import { saveLog, bumpCount, clearLog } from "@/actions/logs";
 
 type Props = {
   habits: Habit[];
+  allHabits?: Habit[];
   categories: HabitCategory[];
   logsByHabit: Map<string, Map<string, HabitLog>>;
   today: string;
   startId?: string | null;
 };
+
+export function getEffectiveNextActiveHabit(
+  habit: Habit,
+  activeHabitIds: Set<string>,
+  allById: Map<string, Habit>
+): Habit | undefined {
+  let curr = habit;
+  const seen = new Set<string>([habit.id]);
+
+  while (curr.next_habit_id && allById.has(curr.next_habit_id)) {
+    const nextId = curr.next_habit_id;
+    if (seen.has(nextId)) break;
+    seen.add(nextId);
+
+    if (activeHabitIds.has(nextId)) {
+      return allById.get(nextId);
+    }
+    curr = allById.get(nextId)!;
+  }
+
+  return undefined;
+}
 
 function getSavedViewMode(): "list" | "chain" {
   if (typeof window === "undefined") return "list";
@@ -35,7 +58,7 @@ function subscribeToViewMode(callback: () => void) {
   return () => window.removeEventListener("storage", callback);
 }
 
-export function TodayRunner({ habits, categories, logsByHabit, today, startId }: Props) {
+export function TodayRunner({ habits, allHabits, categories, logsByHabit, today, startId }: Props) {
   const { t } = useLang();
   const router = useRouter();
   const state = useOverlayState({ defaultOpen: !!startId });
@@ -44,6 +67,7 @@ export function TodayRunner({ habits, categories, logsByHabit, today, startId }:
   const [savingHabitIds, setSavingHabitIds] = useState<Set<string>>(new Set());
   const [optimisticLogs, setOptimisticLogs] = useState<Map<string, HabitLog | null>>(new Map());
   const [customCounts, setCustomCounts] = useState<Record<string, number>>({});
+  const [customSubCounts, setCustomSubCounts] = useState<Record<string, Record<string, number>>>({});
 
   const storedMode = useSyncExternalStore(subscribeToViewMode, getSavedViewMode, () => "list");
   const [localMode, setLocalMode] = useState<"list" | "chain" | null>(null);
@@ -87,6 +111,9 @@ export function TodayRunner({ habits, categories, logsByHabit, today, startId }:
   const bgY2 = useTransform(bgDragX, [-240, 0, 240], [10, 20, 10]);
   const bgOpacity2 = useTransform(bgDragX, [-240, 0, 240], [0.85, 0.55, 0.85]);
 
+  const fullHabitsList = allHabits ?? habits;
+  const allById = useMemo(() => new Map(fullHabitsList.map((h) => [h.id, h])), [fullHabitsList]);
+  const activeIds = useMemo(() => new Set(habits.map((h) => h.id)), [habits]);
   const byId = useMemo(() => new Map(habits.map((h) => [h.id, h])), [habits]);
 
   const openChain = useCallback((firstId: string) => {
@@ -106,13 +133,10 @@ export function TodayRunner({ habits, categories, logsByHabit, today, startId }:
     if (!current) return { nextHabit: undefined, nextNextHabit: undefined };
 
     const getNextAfter = (fromHabit: Habit, excludeIds: string[]): Habit | undefined => {
-      // 1. Explicit chained next_habit_id if active and not excluded
-      if (
-        fromHabit.next_habit_id &&
-        byId.has(fromHabit.next_habit_id) &&
-        !excludeIds.includes(fromHabit.next_habit_id)
-      ) {
-        return byId.get(fromHabit.next_habit_id);
+      // 1. Explicit chained next active habit (skipping any inactive habits in between)
+      const nextActive = getEffectiveNextActiveHabit(fromHabit, activeIds, allById);
+      if (nextActive && !excludeIds.includes(nextActive.id)) {
+        return nextActive;
       }
 
       // 2. Otherwise, check next active habit in today's list
@@ -132,7 +156,7 @@ export function TodayRunner({ habits, categories, logsByHabit, today, startId }:
     const next2 = next1 ? getNextAfter(next1, [...visitedIds, next1.id]) : undefined;
 
     return { nextHabit: next1, nextNextHabit: next2 };
-  }, [current, byId, visitedIds, habits]);
+  }, [current, visitedIds, habits, activeIds, allById]);
 
   const nextCat = nextHabit ? categories.find((c) => c.id === nextHabit.category_id) : undefined;
   const nextNextCat = nextNextHabit ? categories.find((c) => c.id === nextNextHabit.category_id) : undefined;
@@ -146,10 +170,23 @@ export function TodayRunner({ habits, categories, logsByHabit, today, startId }:
   const localCount = current && customCounts[current.id] !== undefined ? customCounts[current.id] : baseCount;
 
   // Non-blocking background save that updates individual habit spinner in "Today"
-  const performSave = useCallback(async (habitId: string, status: "done" | "missed", count?: number) => {
+  const performSave = useCallback(async (
+    habitId: string,
+    status: "done" | "missed",
+    count?: number,
+    counts?: Record<string, number>
+  ) => {
     setSavingHabitIds((prev) => new Set(prev).add(habitId));
 
     const targetHabit = byId.get(habitId);
+    let effectiveCounts = counts;
+    if (!effectiveCounts && targetHabit?.counters && targetHabit.counters.length > 0) {
+      effectiveCounts = {};
+      for (const c of targetHabit.counters) {
+        effectiveCounts[c.id] = status === "done" ? c.target_count : 0;
+      }
+    }
+
     if (targetHabit) {
       setOptimisticLogs((prev) => {
         const next = new Map(prev);
@@ -160,6 +197,7 @@ export function TodayRunner({ habits, categories, logsByHabit, today, startId }:
           date: today,
           status,
           count: count ?? (targetHabit.tracking_mode === "count" ? (status === "done" ? (targetHabit.target_count ?? 1) : 0) : null),
+          counts: effectiveCounts ?? {},
         });
         return next;
       });
@@ -170,6 +208,7 @@ export function TodayRunner({ habits, categories, logsByHabit, today, startId }:
       fd.set("date", today);
       fd.set("status", status);
       if (count !== undefined) fd.set("count", String(count));
+      if (effectiveCounts) fd.set("counts", JSON.stringify(effectiveCounts));
       const res = await saveLog(habitId, fd);
       if (res?.error) {
         toast.danger(t.errors.saveFail);
@@ -231,6 +270,11 @@ export function TodayRunner({ habits, categories, logsByHabit, today, startId }:
       delete next[habitId];
       return next;
     });
+    setCustomSubCounts((prev) => {
+      const next = { ...prev };
+      delete next[habitId];
+      return next;
+    });
     try {
       await clearLog(habitId, today);
       router.refresh();
@@ -250,13 +294,40 @@ export function TodayRunner({ habits, categories, logsByHabit, today, startId }:
     }
   }, [today, router, t]);
 
-  const bumpHabit = useCallback(async (target: Habit, d: number) => {
+  const bumpHabit = useCallback(async (target: Habit, d: number, counterId?: string) => {
     const currentOpt = optimisticLogs.has(target.id)
       ? optimisticLogs.get(target.id)
       : logsByHabit.get(target.id)?.get(today);
-    const prevCount = customCounts[target.id] !== undefined ? customCounts[target.id] : (currentOpt?.count ?? 0);
-    const next = Math.max(0, prevCount + d);
-    setCustomCounts((prev) => ({ ...prev, [target.id]: next }));
+
+    let nextCount: number;
+    let nextSubCounts: Record<string, number> = { ...(currentOpt?.counts ?? customSubCounts[target.id] ?? {}) };
+
+    if (counterId) {
+      const prevSub = nextSubCounts[counterId] ?? 0;
+      nextSubCounts[counterId] = Math.max(0, prevSub + d);
+      nextCount = Object.values(nextSubCounts).reduce((a, b) => a + (Number(b) || 0), 0);
+      setCustomSubCounts((prev) => ({ ...prev, [target.id]: nextSubCounts }));
+    } else {
+      const prevCount = customCounts[target.id] !== undefined ? customCounts[target.id] : (currentOpt?.count ?? 0);
+      nextCount = Math.max(0, prevCount + d);
+      if (target.counters && target.counters.length > 0) {
+        const firstId = target.counters[0].id;
+        nextSubCounts[firstId] = Math.max(0, (nextSubCounts[firstId] ?? 0) + d);
+        nextCount = Object.values(nextSubCounts).reduce((a, b) => a + (Number(b) || 0), 0);
+        setCustomSubCounts((prev) => ({ ...prev, [target.id]: nextSubCounts }));
+      }
+    }
+    setCustomCounts((prev) => ({ ...prev, [target.id]: nextCount }));
+
+    let isDone = false;
+    if (target.counters && target.counters.length > 0) {
+      isDone = target.counters.every((c) => {
+        const val = nextSubCounts[c.id] ?? 0;
+        return target.type === "avoid" ? val <= c.target_count : val >= c.target_count;
+      });
+    } else {
+      isDone = nextCount >= (target.target_count ?? 1);
+    }
 
     setSavingHabitIds((prev) => new Set(prev).add(target.id));
     setOptimisticLogs((prev) => {
@@ -266,14 +337,15 @@ export function TodayRunner({ habits, categories, logsByHabit, today, startId }:
         user_id: target.user_id,
         habit_id: target.id,
         date: today,
-        status: next >= (target.target_count ?? 1) ? "done" : "missed",
-        count: next,
+        status: isDone ? "done" : "missed",
+        count: nextCount,
+        counts: nextSubCounts,
       });
       return nextMap;
     });
 
     try {
-      await bumpCount(target.id, today, d);
+      await bumpCount(target.id, today, d, counterId);
       router.refresh();
     } catch {
       toast.danger(t.errors.saveFail);
@@ -284,11 +356,11 @@ export function TodayRunner({ habits, categories, logsByHabit, today, startId }:
         return next;
       });
     }
-  }, [optimisticLogs, logsByHabit, today, customCounts, router, t]);
+  }, [optimisticLogs, logsByHabit, today, customCounts, customSubCounts, router, t]);
 
-  const bump = useCallback(async (d: number) => {
+  const bump = useCallback(async (d: number, counterId?: string) => {
     if (!current) return;
-    await bumpHabit(current, d);
+    await bumpHabit(current, d, counterId);
   }, [current, bumpHabit]);
 
   const markHabit = useCallback((target: Habit, status: "done" | "missed", count?: number) => {
@@ -375,7 +447,9 @@ export function TodayRunner({ habits, categories, logsByHabit, today, startId }:
                           <span className="inline-flex items-center gap-1 font-medium text-success">
                             <Check size={13} strokeWidth={2.5} />
                             {h.tracking_mode === "count"
-                              ? `${log.count ?? 0} ${t.habit.of} ${h.target_count} ${h.unit ?? ""}`
+                              ? h.counters && h.counters.length > 0
+                                ? h.counters.map((cnt) => `${log.count != null ? (log.counts?.[cnt.id] ?? 0) : 0}/${cnt.target_count} ${cnt.name}`).join(" · ")
+                                : `${log.count ?? 0} ${t.habit.of} ${h.target_count} ${h.unit ?? ""}`
                               : h.type === "avoid" ? t.habit.clean : t.today.done}
                           </span>
                         ) : log?.status === "missed" ? (
@@ -386,7 +460,9 @@ export function TodayRunner({ habits, categories, logsByHabit, today, startId }:
                         ) : (
                           <span className="text-muted">
                             {h.tracking_mode === "count"
-                              ? `0 ${t.habit.of} ${h.target_count} ${h.unit ?? ""}`
+                              ? h.counters && h.counters.length > 0
+                                ? h.counters.map((cnt) => `0/${cnt.target_count} ${cnt.name}`).join(" · ")
+                                : `0 ${t.habit.of} ${h.target_count} ${h.unit ?? ""}`
                               : t.habit.pendingToday}
                           </span>
                         )}
@@ -452,6 +528,7 @@ export function TodayRunner({ habits, categories, logsByHabit, today, startId }:
       ) : (
         <TodayChainView
           habits={habits}
+          allHabits={fullHabitsList}
           categories={categories}
           logsByHabit={logsByHabit}
           optimisticLogs={optimisticLogs}
@@ -522,6 +599,7 @@ export function TodayRunner({ habits, categories, logsByHabit, today, startId }:
                         current={current}
                         cat={cat}
                         localCount={localCount}
+                        localCounts={currentOptLog?.counts ?? customSubCounts[current.id] ?? {}}
                         bump={bump}
                         onDragProgress={(ox) => bgDragX.set(ox)}
                         onDragCancel={() => {
@@ -555,6 +633,7 @@ function SwipeCard({
   current,
   cat,
   localCount,
+  localCounts,
   bump,
   onDragProgress,
   onDragCancel,
@@ -564,7 +643,8 @@ function SwipeCard({
   current: Habit;
   cat?: HabitCategory;
   localCount: number;
-  bump: (d: number) => void;
+  localCounts?: Record<string, number>;
+  bump: (d: number, counterId?: string) => void;
   onDragProgress?: (x: number) => void;
   onDragCancel?: () => void;
   onStartDismiss?: (status: "done" | "missed", count?: number) => void;
@@ -710,38 +790,86 @@ function SwipeCard({
 
       {/* Contador con estilo frosted glass matching AppNav */}
       {current.tracking_mode === "count" && (
-        <div
-          className="flex items-center gap-3 py-1.5 px-3 rounded-2xl bg-background/40 backdrop-blur-md border border-border/50 relative z-30 pointer-events-auto"
-          onPointerDown={(e) => e.stopPropagation()}
-          aria-live="polite"
-        >
-          <Button
-            isIconOnly
-            size="sm"
-            variant="secondary"
-            aria-label="-1"
-            className="h-8 w-8 rounded-xl active:scale-95 transition-transform"
-            onPress={() => bump(-1)}
+        current.counters && current.counters.length > 0 ? (
+          <div
+            className="flex flex-col gap-2 w-full max-w-xs relative z-30 pointer-events-auto"
+            onPointerDown={(e) => e.stopPropagation()}
+            aria-live="polite"
           >
-            <Minus size={15} />
-          </Button>
-          <span className="min-w-24 text-2xl font-bold tabular-nums">
-            {localCount}{" "}
-            <span className="text-sm font-normal text-muted">
-              / {current.target_count} {current.unit ?? ""}
+            {current.counters.map((c) => {
+              const subCount = localCounts?.[c.id] ?? 0;
+              const isSubDone = current.type === "avoid" ? subCount <= c.target_count : subCount >= c.target_count;
+              return (
+                <div
+                  key={c.id}
+                  className="flex items-center justify-between gap-2 px-3 py-1.5 rounded-2xl bg-background/50 backdrop-blur-md border border-border/50"
+                >
+                  <div className="flex flex-col text-left min-w-0">
+                    <span className="text-xs font-semibold truncate text-foreground">{c.name}</span>
+                    <span className={`text-[11px] font-medium tabular-nums ${isSubDone ? "text-success" : "text-muted"}`}>
+                      {subCount} / {c.target_count} {c.unit ?? ""}
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-1.5 shrink-0">
+                    <Button
+                      isIconOnly
+                      size="sm"
+                      variant="secondary"
+                      aria-label={`-1 ${c.name}`}
+                      className="h-7 w-7 rounded-xl active:scale-95 transition-transform"
+                      onPress={() => bump(-1, c.id)}
+                    >
+                      <Minus size={13} />
+                    </Button>
+                    <Button
+                      isIconOnly
+                      size="sm"
+                      variant="secondary"
+                      aria-label={`+1 ${c.name}`}
+                      className="h-7 w-7 rounded-xl active:scale-95 transition-transform"
+                      onPress={() => bump(1, c.id)}
+                    >
+                      <Plus size={13} />
+                    </Button>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        ) : (
+          <div
+            className="flex items-center gap-3 py-1.5 px-3 rounded-2xl bg-background/40 backdrop-blur-md border border-border/50 relative z-30 pointer-events-auto"
+            onPointerDown={(e) => e.stopPropagation()}
+            aria-live="polite"
+          >
+            <Button
+              isIconOnly
+              size="sm"
+              variant="secondary"
+              aria-label="-1"
+              className="h-8 w-8 rounded-xl active:scale-95 transition-transform"
+              onPress={() => bump(-1)}
+            >
+              <Minus size={15} />
+            </Button>
+            <span className="min-w-24 text-2xl font-bold tabular-nums">
+              {localCount}{" "}
+              <span className="text-sm font-normal text-muted">
+                / {current.target_count} {current.unit ?? ""}
+              </span>
             </span>
-          </span>
-          <Button
-            isIconOnly
-            size="sm"
-            variant="secondary"
-            aria-label="+1"
-            className="h-8 w-8 rounded-xl active:scale-95 transition-transform"
-            onPress={() => bump(1)}
-          >
-            <Plus size={15} />
-          </Button>
-        </div>
+            <Button
+              isIconOnly
+              size="sm"
+              variant="secondary"
+              aria-label="+1"
+              className="h-8 w-8 rounded-xl active:scale-95 transition-transform"
+              onPress={() => bump(1)}
+            >
+              <Plus size={15} />
+            </Button>
+          </div>
+        )
       )}
     </motion.div>
   );
@@ -770,17 +898,28 @@ function SwipeCardStatic({ habit, cat }: { habit: Habit; cat?: HabitCategory }) 
       </div>
 
       {habit.tracking_mode === "count" && (
-        <div className="flex items-center gap-3 py-1.5 px-3 rounded-2xl bg-background/40 backdrop-blur-md border border-border/50 opacity-60">
-          <Button isIconOnly size="sm" variant="secondary" className="h-8 w-8 rounded-xl" isDisabled>
-            <Minus size={15} />
-          </Button>
-          <span className="min-w-24 text-2xl font-bold tabular-nums text-muted">
-            0 <span className="text-sm font-normal">/ {habit.target_count} {habit.unit ?? ""}</span>
-          </span>
-          <Button isIconOnly size="sm" variant="secondary" className="h-8 w-8 rounded-xl" isDisabled>
-            <Plus size={15} />
-          </Button>
-        </div>
+        habit.counters && habit.counters.length > 0 ? (
+          <div className="flex flex-col gap-1.5 w-full max-w-xs opacity-60">
+            {habit.counters.map((c) => (
+              <div key={c.id} className="flex items-center justify-between px-3 py-1 rounded-xl bg-background/40 border border-border/40 text-xs text-muted">
+                <span>{c.name}</span>
+                <span>0 / {c.target_count} {c.unit ?? ""}</span>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <div className="flex items-center gap-3 py-1.5 px-3 rounded-2xl bg-background/40 backdrop-blur-md border border-border/50 opacity-60">
+            <Button isIconOnly size="sm" variant="secondary" className="h-8 w-8 rounded-xl" isDisabled>
+              <Minus size={15} />
+            </Button>
+            <span className="min-w-24 text-2xl font-bold tabular-nums text-muted">
+              0 <span className="text-sm font-normal">/ {habit.target_count} {habit.unit ?? ""}</span>
+            </span>
+            <Button isIconOnly size="sm" variant="secondary" className="h-8 w-8 rounded-xl" isDisabled>
+              <Plus size={15} />
+            </Button>
+          </div>
+        )
       )}
     </div>
   );

@@ -17,6 +17,13 @@ export type HabitType = "build" | "avoid";
 export type TrackingMode = "check" | "count";
 export type LogStatus = "done" | "missed";
 
+export type HabitCounter = {
+  id: string;
+  name: string;
+  target_count: number;
+  unit?: string | null;
+};
+
 export type HabitCategory = {
   id: string;
   user_id: string;
@@ -37,8 +44,19 @@ export type Habit = {
   tracking_mode: TrackingMode;
   target_count: number | null;
   unit: string | null;
+  counters?: HabitCounter[] | null;
+  chain_name?: string | null;
+  chain_time?: string | null;
   archived: boolean;
   created_at: string;
+};
+
+export type HabitChain = {
+  id: string;
+  headId: string;
+  name: string;
+  time?: string | null;
+  habits: Habit[];
 };
 
 export type HabitLog = {
@@ -48,6 +66,7 @@ export type HabitLog = {
   date: string; // YYYY-MM-DD local
   status: LogStatus;
   count: number | null;
+  counts?: Record<string, number> | null;
 };
 
 /** 1=lun … 7=dom (ISO). */

@@ -23,7 +23,7 @@ export default async function HabitosPage() {
 
   return (
     <AppShell lang={lang} name={profile?.name}>
-      <HabitsClient habits={habits} categories={categories} streaks={streaks} />
+      <HabitsClient habits={habits} categories={categories} streaks={streaks} logsByHabit={byHabit} today={today} />
     </AppShell>
   );
 }

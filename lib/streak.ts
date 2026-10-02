@@ -1,3 +1,5 @@
+import type { Habit, HabitLog } from "@/lib/types";
+
 export type Streak = {
   current: number;
   best: number;
@@ -95,4 +97,68 @@ export function computeHabitStreak(
   current = curBuilt;
 
   return { current, best, freeze, todayPending, todayCovered };
+}
+
+/**
+ * Racha para una cadena completa de hábitos.
+ * - Una cadena está 'done' en una fecha si TODOS los hábitos de la cadena tienen log 'done'.
+ * - Está 'missed' si AL MENOS UN hábito tiene log 'missed' (o no tiene log en día activo pasado).
+ * - Días activos de la cadena: intersección de days_active de todos los hábitos en la cadena.
+ *   Si la intersección estuviera vacía, se usa el days_active del primer hábito.
+ * - Se delega a computeHabitStreak para mantener idéntico comportamiento de freeze y racha.
+ */
+export function computeChainStreak(
+  chainHabits: Habit[],
+  logsByHabit: Map<string, Map<string, HabitLog>>,
+  todayISO: string
+): Streak {
+  if (chainHabits.length === 0) {
+    return { current: 0, best: 0, freeze: false, todayPending: false, todayCovered: false };
+  }
+
+  // 1. Días activos comunes de la cadena
+  let commonDays = new Set(chainHabits[0].days_active);
+  for (let i = 1; i < chainHabits.length; i++) {
+    const nextSet = new Set(chainHabits[i].days_active);
+    commonDays = new Set([...commonDays].filter((d) => nextSet.has(d)));
+  }
+  const daysActive = commonDays.size > 0 ? Array.from(commonDays).sort() : chainHabits[0].days_active;
+
+  // 2. Construir mapa unificado de logs de la cadena
+  const chainLogs: Record<string, "done" | "missed"> = {};
+
+  // Recolectar todas las fechas en que cualquier hábito de la cadena tiene registro
+  const allDates = new Set<string>();
+  for (const h of chainHabits) {
+    const m = logsByHabit.get(h.id);
+    if (m) {
+      for (const d of m.keys()) {
+        allDates.add(d);
+      }
+    }
+  }
+
+  for (const date of allDates) {
+    let allDone = true;
+    let anyMissed = false;
+
+    for (const h of chainHabits) {
+      const log = logsByHabit.get(h.id)?.get(date);
+      if (log?.status === "missed") {
+        anyMissed = true;
+        allDone = false;
+        break;
+      } else if (log?.status !== "done") {
+        allDone = false;
+      }
+    }
+
+    if (allDone) {
+      chainLogs[date] = "done";
+    } else if (anyMissed) {
+      chainLogs[date] = "missed";
+    }
+  }
+
+  return computeHabitStreak(chainLogs, daysActive, todayISO);
 }

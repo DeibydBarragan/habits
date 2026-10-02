@@ -34,7 +34,7 @@ export default async function HoyPage({ searchParams }: { searchParams?: Promise
             <p className="mt-1 text-sm text-muted">{t.today.emptySub}</p>
           </div>
         ) : (
-          <TodayRunner habits={active} categories={categories} logsByHabit={byHabit} today={today} startId={sp?.abrir ?? null} />
+          <TodayRunner habits={active} allHabits={habits} categories={categories} logsByHabit={byHabit} today={today} startId={sp?.abrir ?? null} />
         )}
       </FadeIn>
     </AppShell>

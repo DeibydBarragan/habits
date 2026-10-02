@@ -32,6 +32,9 @@ create table if not exists public.habits (
   tracking_mode text not null default 'check' check (tracking_mode in ('check','count')),
   target_count int null check (target_count is null or target_count > 0),
   unit text null,
+  counters jsonb null default '[]'::jsonb,
+  chain_name text null,
+  chain_time text null,
   archived boolean not null default false,
   created_at timestamptz default now(),
   check (next_habit_id is null or next_habit_id <> id)
@@ -47,6 +50,7 @@ create table if not exists public.habit_logs (
   date date not null,
   status text not null check (status in ('done','missed')),
   count int null check (count is null or count >= 0),
+  counts jsonb null default '{}'::jsonb,
   created_at timestamptz default now(),
   updated_at timestamptz default now(),
   unique(habit_id, date)

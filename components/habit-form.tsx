@@ -1,20 +1,19 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useMemo, useState, useTransition } from "react";
 import {
   Button,
   Input,
   Label,
-  ListBox,
-  Select,
   Spinner,
   TextField,
 } from "@heroui/react";
 import { useLang } from "@/components/language";
 import { IconPicker } from "@/components/icon-picker";
-import { PALETTE_12, type Habit, type HabitCategory } from "@/lib/types";
+import { SearchableSelect } from "@/components/searchable-select";
+import { PALETTE_12, type Habit, type HabitCategory, type HabitCounter } from "@/lib/types";
 import { createHabit, updateHabit } from "@/actions/habits";
-import { Check } from "lucide-react";
+import { Check, Plus, Trash2 } from "lucide-react";
 
 const DAYS = [1, 2, 3, 4, 5, 6, 7];
 const DAY_SHORT_ES = ["L", "M", "X", "J", "V", "S", "D"];
@@ -36,7 +35,14 @@ export function HabitForm({
   const [error, setError] = useState<string>();
   const [type, setType] = useState<"build" | "avoid">(initial?.type ?? "build");
   const [tracking, setTracking] = useState<"check" | "count">(initial?.tracking_mode ?? "check");
+  const [counterMode, setCounterMode] = useState<"single" | "multi">(
+    initial?.counters && initial.counters.length > 0 ? "multi" : "single"
+  );
+  const [counters, setCounters] = useState<HabitCounter[]>(
+    initial?.counters && initial.counters.length > 0 ? initial.counters : []
+  );
   const [catId, setCatId] = useState(initial?.category_id ?? categories[0]?.id ?? "");
+  const [nextHabitId, setNextHabitId] = useState<string | null>(initial?.next_habit_id ?? null);
   const catColor = categories.find((c) => c.id === catId)?.color ?? PALETTE_12[7];
   const [color, setColor] = useState(initial?.color ?? catColor);
   const [colorTouched, setColorTouched] = useState(!!initial);
@@ -45,15 +51,99 @@ export function HabitForm({
   const shownColor = colorTouched ? color : catColor;
   const dayLabels = lang === "es" ? DAY_SHORT_ES : DAY_SHORT_EN;
 
+  const categoryOptions = useMemo(() => {
+    return categories.map((c) => ({
+      id: c.id,
+      label: c.name,
+      color: c.color,
+      icon: c.icon,
+    }));
+  }, [categories]);
+
+  const nextHabitOptions = useMemo(() => {
+    return habits
+      .filter((h) => h.id !== initial?.id)
+      .map((h) => {
+        const c = categories.find((cat) => cat.id === h.category_id);
+        return {
+          id: h.id,
+          label: h.name,
+          sublabel: c?.name,
+          color: h.color,
+          icon: c?.icon,
+        };
+      });
+  }, [habits, initial?.id, categories]);
+
+  function handleAddCounter() {
+    setCounters((prev) => [
+      ...prev,
+      {
+        id: `cnt_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
+        name: "",
+        target_count: 1,
+        unit: "",
+      },
+    ]);
+  }
+
+  function handleRemoveCounter(id: string) {
+    setCounters((prev) => prev.filter((c) => c.id !== id));
+  }
+
+  function handleUpdateCounter(id: string, updates: Partial<HabitCounter>) {
+    setCounters((prev) =>
+      prev.map((c) => (c.id === id ? { ...c, ...updates } : c))
+    );
+  }
+
+  function switchCounterMode(mode: "single" | "multi") {
+    setCounterMode(mode);
+    if (mode === "multi" && counters.length === 0) {
+      setCounters([
+        {
+          id: `cnt_${Date.now()}_1`,
+          name: "",
+          target_count: 1,
+          unit: "",
+        },
+        {
+          id: `cnt_${Date.now()}_2`,
+          name: "",
+          target_count: 1,
+          unit: "",
+        },
+      ]);
+    }
+  }
+
   function toggleDay(d: number) {
     setDays((prev) => (prev.includes(d) ? prev.filter((x) => x !== d) : [...prev, d].sort()));
   }
 
   function handle(fd: FormData) {
     fd.set("type", type);
+    fd.set("category_id", catId);
+    fd.set("next_habit_id", nextHabitId || "");
     fd.set("tracking_mode", tracking);
     fd.set("color", shownColor);
     fd.set("days_active", days.join(","));
+
+    if (tracking === "count") {
+      if (counterMode === "multi") {
+        const validCounters = counters.filter((c) => c.name.trim().length > 0);
+        if (validCounters.length === 0) {
+          setError(t.errors.needTarget);
+          return;
+        }
+        fd.set("counters", JSON.stringify(validCounters));
+      } else {
+        fd.set("counters", "[]");
+      }
+    } else {
+      fd.set("counters", "[]");
+    }
+
     startTransition(async () => {
       setError(undefined);
       const res = initial
@@ -92,23 +182,20 @@ export function HabitForm({
         </div>
       </div>
 
-      <Select fullWidth isRequired name="category_id" defaultValue={catId} placeholder={t.habit.choose} onSelectionChange={(k) => { const id = String(k); setCatId(id); }}>
-        <Label>{t.habit.category}</Label>
-        <Select.Trigger>
-          <Select.Value />
-          <Select.Indicator />
-        </Select.Trigger>
-        <Select.Popover>
-          <ListBox>
-            {categories.map((c) => (
-              <ListBox.Item key={c.id} id={c.id} textValue={c.name}>
-                {c.name}
-                <ListBox.ItemIndicator />
-              </ListBox.Item>
-            ))}
-          </ListBox>
-        </Select.Popover>
-      </Select>
+      <div className="flex flex-col gap-1.5">
+        <SearchableSelect
+          label={t.habit.category}
+          placeholder={t.habit.choose}
+          searchPlaceholder={t.habit.choose}
+          options={categoryOptions}
+          value={catId}
+          onChange={(val) => {
+            if (val) setCatId(val);
+          }}
+          allowClear={false}
+        />
+        <input type="hidden" name="category_id" value={catId} />
+      </div>
 
       <div className="flex flex-col gap-1.5">
         <span className="text-xs font-medium text-muted">{t.habit.color}</span>
@@ -173,36 +260,113 @@ export function HabitForm({
       </div>
 
       {tracking === "count" && (
-        <div className="grid grid-cols-2 gap-3">
-          <TextField fullWidth name="target_count" type="number" defaultValue={String(initial?.target_count ?? 8)}>
-            <Label>{t.habit.target}</Label>
-            <Input inputMode="numeric" min={1} />
-          </TextField>
-          <TextField fullWidth name="unit" defaultValue={initial?.unit ?? ""}>
-            <Label>{t.habit.unit}</Label>
-            <Input placeholder={t.habit.unitPh} spellCheck={false} />
-          </TextField>
+        <div className="flex flex-col gap-3 p-3 rounded-2xl bg-surface/50 border border-border/40">
+          <div className="flex flex-col gap-1.5">
+            <span className="text-xs font-medium text-muted">{t.habit.counterMode}</span>
+            <div className="grid grid-cols-2 gap-2">
+              <button
+                type="button"
+                aria-pressed={counterMode === "single"}
+                onClick={() => switchCounterMode("single")}
+                className={`rounded-xl px-2.5 py-1.5 text-xs font-medium transition ${counterMode === "single" ? "border-accent bg-accent/15 text-accent font-semibold" : "bg-surface text-muted hover:text-foreground"}`}
+              >
+                {t.habit.singleCounter}
+              </button>
+              <button
+                type="button"
+                aria-pressed={counterMode === "multi"}
+                onClick={() => switchCounterMode("multi")}
+                className={`rounded-xl px-2.5 py-1.5 text-xs font-medium transition ${counterMode === "multi" ? "border-accent bg-accent/15 text-accent font-semibold" : "bg-surface text-muted hover:text-foreground"}`}
+              >
+                {t.habit.multiCounter}
+              </button>
+            </div>
+          </div>
+
+          {counterMode === "single" ? (
+            <div className="grid grid-cols-2 gap-3">
+              <TextField fullWidth name="target_count" type="number" defaultValue={String(initial?.target_count ?? 8)}>
+                <Label>{t.habit.target}</Label>
+                <Input inputMode="numeric" min={1} />
+              </TextField>
+              <TextField fullWidth name="unit" defaultValue={initial?.unit ?? ""}>
+                <Label>{t.habit.unit}</Label>
+                <Input placeholder={t.habit.unitPh} spellCheck={false} />
+              </TextField>
+            </div>
+          ) : (
+            <div className="flex flex-col gap-2.5">
+              <div className="flex flex-col gap-2">
+                {counters.map((c) => (
+                  <div key={c.id} className="flex items-center gap-2 bg-surface p-2 rounded-xl border border-border/30">
+                    <input
+                      type="text"
+                      placeholder={t.habit.counterNamePh}
+                      value={c.name}
+                      onChange={(e) => handleUpdateCounter(c.id, { name: e.target.value })}
+                      className="flex-1 min-w-0 text-xs h-8 rounded-lg bg-background/60 border border-border/40 px-2.5 outline-none focus:border-accent text-foreground"
+                      spellCheck={false}
+                    />
+                    <input
+                      type="number"
+                      min={1}
+                      placeholder={t.habit.counterTarget}
+                      value={c.target_count || ""}
+                      onChange={(e) => handleUpdateCounter(c.id, { target_count: Math.max(1, parseInt(e.target.value) || 1) })}
+                      className="w-16 shrink-0 text-xs h-8 rounded-lg bg-background/60 border border-border/40 px-2 text-center outline-none focus:border-accent text-foreground tabular-nums"
+                    />
+                    <input
+                      type="text"
+                      placeholder={t.habit.counterUnit}
+                      value={c.unit ?? ""}
+                      onChange={(e) => handleUpdateCounter(c.id, { unit: e.target.value || null })}
+                      className="w-20 shrink-0 text-xs h-8 rounded-lg bg-background/60 border border-border/40 px-2 outline-none focus:border-accent text-foreground"
+                      spellCheck={false}
+                    />
+                    {counters.length > 1 && (
+                      <Button
+                        isIconOnly
+                        size="sm"
+                        variant="ghost"
+                        aria-label={t.habit.removeCounter}
+                        className="h-8 w-8 text-danger/70 hover:text-danger hover:bg-danger/10 shrink-0"
+                        onPress={() => handleRemoveCounter(c.id)}
+                      >
+                        <Trash2 size={14} />
+                      </Button>
+                    )}
+                  </div>
+                ))}
+              </div>
+
+              <Button
+                type="button"
+                size="sm"
+                variant="secondary"
+                className="self-start text-xs h-8"
+                onPress={handleAddCounter}
+              >
+                <Plus size={13} className="mr-1" />
+                {t.habit.addCounter}
+              </Button>
+            </div>
+          )}
         </div>
       )}
 
-      <Select fullWidth name="next_habit_id" defaultValue={initial?.next_habit_id ?? ""} placeholder={t.habit.none}>
-        <Label>{t.habit.next}</Label>
-        <Select.Trigger>
-          <Select.Value />
-          <Select.Indicator />
-        </Select.Trigger>
-        <Select.Popover>
-          <ListBox>
-            <ListBox.Item id="" textValue={t.habit.none}>{t.habit.none}</ListBox.Item>
-            {habits.filter((h) => h.id !== initial?.id).map((h) => (
-              <ListBox.Item key={h.id} id={h.id} textValue={h.name}>
-                {h.name}
-                <ListBox.ItemIndicator />
-              </ListBox.Item>
-            ))}
-          </ListBox>
-        </Select.Popover>
-      </Select>
+      <div className="flex flex-col gap-1.5">
+        <SearchableSelect
+          label={t.habit.next}
+          placeholder={t.habit.none}
+          emptyLabel={t.habit.none}
+          searchPlaceholder={t.habit.next}
+          options={nextHabitOptions}
+          value={nextHabitId}
+          onChange={(val) => setNextHabitId(val)}
+          allowClear={true}
+        />
+        <input type="hidden" name="next_habit_id" value={nextHabitId || ""} />
+      </div>
 
       {error && <p aria-live="polite" className="text-sm text-danger">{error}</p>}
 

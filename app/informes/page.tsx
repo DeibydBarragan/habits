@@ -25,7 +25,7 @@ export default async function InformesPage() {
         <h1 className="text-2xl font-semibold tracking-tight text-balance">{t.reports.title}</h1>
         <p className="mt-1 text-sm text-muted">{t.reports.subtitle}</p>
       </FadeIn>
-      <ReportsClient habits={habits} categories={categories} logs={logs} streaks={streaks} today={today} />
+      <ReportsClient habits={habits} categories={categories} logs={logs} logsByHabit={byHabit} streaks={streaks} today={today} />
     </AppShell>
   );
 }
