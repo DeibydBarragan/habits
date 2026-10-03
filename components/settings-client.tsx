@@ -5,9 +5,9 @@ import { Pencil, User } from "lucide-react";
 import { Button, Card, Input, Label, Spinner, TextField, toast, useOverlayState } from "@heroui/react";
 import { useLang } from "@/components/language";
 import { GlassModal } from "@/components/glass-modal";
-import { updateProfile, resetStreaks, deleteAccount } from "@/actions/account";
+import { updateProfile, resetStreaks, deleteAccount, setPassword } from "@/actions/account";
 
-export function SettingsClient({ name, email }: { name: string | null; email: string | null }) {
+export function SettingsClient({ name, email, hasPassword }: { name: string | null; email: string | null; hasPassword: boolean }) {
   const { t } = useLang();
   const nameModal = useOverlayState();
   const [confirmReset, setConfirmReset] = useState(false);
@@ -51,6 +51,13 @@ export function SettingsClient({ name, email }: { name: string | null; email: st
       >
         <NameForm key={name ?? ""} current={name ?? ""} onDone={() => nameModal.close()} />
       </GlassModal>
+
+      {/* Password Card */}
+      <Card className="rounded-2xl border border-white/20 dark:border-white/10 bg-surface/80 dark:bg-zinc-900/70 backdrop-blur-md shadow-xs">
+        <Card.Content className="p-4 sm:p-5">
+          <PasswordForm key={String(hasPassword)} hasPassword={hasPassword} />
+        </Card.Content>
+      </Card>
 
       {/* Danger Zone Card */}
       <Card className="rounded-2xl border border-danger/30 bg-danger/5 backdrop-blur-md shadow-xs">
@@ -111,6 +118,81 @@ export function SettingsClient({ name, email }: { name: string | null; email: st
         </Card.Content>
       </Card>
     </div>
+  );
+}
+
+function PasswordForm({ hasPassword }: { hasPassword: boolean }) {
+  const { t } = useLang();
+  const [error, setError] = useState<string>();
+  const [pending, startTransition] = useTransition();
+
+  function handle(fd: FormData) {
+    const password = String(fd.get("password") ?? "");
+    const confirm = String(fd.get("confirm") ?? "");
+    if (password !== confirm) {
+      setError(t.settings.passMismatch);
+      return;
+    }
+    startTransition(async () => {
+      setError(undefined);
+      const res = await setPassword(fd);
+      if (res?.error) setError(res.error);
+      else {
+        toast.success(t.settings.passSaved);
+        (document.getElementById("password-form") as HTMLFormElement | null)?.reset();
+      }
+    });
+  }
+
+  return (
+    <form id="password-form" action={handle} className="flex flex-col gap-4">
+      <div>
+        <p className="text-sm font-semibold">
+          {hasPassword ? t.settings.changePassword : t.settings.createPassword}
+        </p>
+        {!hasPassword && (
+          <p className="mt-1 text-xs text-muted">{t.settings.createPasswordHint}</p>
+        )}
+      </div>
+      <TextField fullWidth isRequired name="password" type="password">
+        <Label className="text-xs font-semibold">{t.settings.newPassword}</Label>
+        <Input
+          placeholder="••••••••"
+          autoComplete="new-password"
+          className="mt-1 rounded-xl glass-input"
+        />
+      </TextField>
+      <TextField fullWidth isRequired name="confirm" type="password">
+        <Label className="text-xs font-semibold">{t.settings.confirmPassword}</Label>
+        <Input
+          placeholder="••••••••"
+          autoComplete="new-password"
+          className="mt-1 rounded-xl glass-input"
+        />
+      </TextField>
+      {error && (
+        <p aria-live="polite" className="text-xs text-danger">
+          {error}
+        </p>
+      )}
+      <div className="pt-2 flex justify-end">
+        <Button
+          fullWidth
+          variant="primary"
+          type="submit"
+          isDisabled={pending}
+          className="rounded-xl shadow-xs font-semibold"
+        >
+          {pending ? (
+            <span className="flex items-center gap-2">
+              <Spinner size="sm" color="current" /> {t.settings.saving}
+            </span>
+          ) : (
+            t.settings.save
+          )}
+        </Button>
+      </div>
+    </form>
   );
 }
 
