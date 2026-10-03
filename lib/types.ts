@@ -86,3 +86,9 @@ export function toLocalISODate(d: Date = new Date()): string {
 export function isHabitActiveOn(habit: Habit, dateISO: string): boolean {
   return habit.days_active.includes(weekdayIso(dateISO));
 }
+
+export function shiftDate(dateISO: string, days: number): string {
+  const d = new Date(dateISO + "T12:00:00");
+  d.setDate(d.getDate() + days);
+  return toLocalISODate(d);
+}

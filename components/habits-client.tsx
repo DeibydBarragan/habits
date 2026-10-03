@@ -2,9 +2,10 @@
 
 import { useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { Button, Card, Input, Label, Modal, Spinner, TextField, toast, useOverlayState } from "@heroui/react";
-import { Clock, Eye, Filter, Layers, Pencil, Plus, Search, Workflow, X } from "lucide-react";
+import { Button, Card, Input, Label, Spinner, TextField, toast, useOverlayState } from "@heroui/react";
+import { Clock, Eye, Filter, FolderPlus, Layers, Pencil, Plus, Search, Workflow, X } from "lucide-react";
 import { useLang } from "@/components/language";
+import { GlassModal } from "@/components/glass-modal";
 import { CategoryIcon } from "@/components/category-icon";
 import { HabitForm } from "@/components/habit-form";
 import { IconPicker } from "@/components/icon-picker";
@@ -131,7 +132,7 @@ export function HabitsClient({
       {/* Tabs & Search Header */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-2 border-b border-border/40">
         {/* Navigation Tabs */}
-        <div className="flex items-center gap-1 p-1 rounded-2xl bg-surface/80 border border-border/40 w-fit">
+        <div className="flex items-center gap-1 p-1 rounded-2xl bg-surface/60 dark:bg-zinc-900/60 backdrop-blur-md border border-white/20 dark:border-white/10 w-fit shadow-xs">
           <button
             type="button"
             onClick={() => {
@@ -178,7 +179,7 @@ export function HabitsClient({
                 ? `${t.common?.search || "Buscar"} ${t.views.tabHabits.toLowerCase()}…`
                 : `${t.common?.search || "Buscar"} ${t.views.tabChains.toLowerCase()}…`
             }
-            className="w-full h-9 pl-9 pr-8 text-xs rounded-xl bg-surface border border-border/50 text-foreground placeholder:text-muted focus:border-accent outline-none transition-colors"
+            className="w-full h-9 pl-9 pr-8 text-xs rounded-xl bg-surface/50 dark:bg-zinc-900/50 backdrop-blur-md border border-white/20 dark:border-white/10 text-foreground placeholder:text-muted focus:border-accent outline-none transition-colors"
           />
           {searchQuery && (
             <button
@@ -204,8 +205,10 @@ export function HabitsClient({
           <button
             type="button"
             onClick={() => setTypeFilter("all")}
-            className={`px-2.5 py-1 rounded-lg text-xs font-medium transition cursor-pointer ${
-              typeFilter === "all" ? "bg-accent/15 text-accent font-semibold border border-accent/30" : "bg-surface text-muted hover:text-foreground border border-border/40"
+            className={`px-2.5 py-1 rounded-xl text-xs font-medium transition cursor-pointer backdrop-blur-sm ${
+              typeFilter === "all"
+                ? "bg-accent/15 text-accent font-semibold border border-accent/30"
+                : "bg-surface/60 dark:bg-zinc-900/60 text-muted hover:text-foreground border border-white/10 dark:border-white/5"
             }`}
           >
             {t.common?.all || "Todos"}
@@ -213,8 +216,10 @@ export function HabitsClient({
           <button
             type="button"
             onClick={() => setTypeFilter("build")}
-            className={`px-2.5 py-1 rounded-lg text-xs font-medium transition cursor-pointer ${
-              typeFilter === "build" ? "bg-accent/15 text-accent font-semibold border border-accent/30" : "bg-surface text-muted hover:text-foreground border border-border/40"
+            className={`px-2.5 py-1 rounded-xl text-xs font-medium transition cursor-pointer backdrop-blur-sm ${
+              typeFilter === "build"
+                ? "bg-accent/15 text-accent font-semibold border border-accent/30"
+                : "bg-surface/60 dark:bg-zinc-900/60 text-muted hover:text-foreground border border-white/10 dark:border-white/5"
             }`}
           >
             {t.habit.build}
@@ -222,8 +227,10 @@ export function HabitsClient({
           <button
             type="button"
             onClick={() => setTypeFilter("avoid")}
-            className={`px-2.5 py-1 rounded-lg text-xs font-medium transition cursor-pointer ${
-              typeFilter === "avoid" ? "bg-accent/15 text-accent font-semibold border border-accent/30" : "bg-surface text-muted hover:text-foreground border border-border/40"
+            className={`px-2.5 py-1 rounded-xl text-xs font-medium transition cursor-pointer backdrop-blur-sm ${
+              typeFilter === "avoid"
+                ? "bg-accent/15 text-accent font-semibold border border-accent/30"
+                : "bg-surface/60 dark:bg-zinc-900/60 text-muted hover:text-foreground border border-white/10 dark:border-white/5"
             }`}
           >
             {t.habit.avoid}
@@ -234,8 +241,10 @@ export function HabitsClient({
           <button
             type="button"
             onClick={() => setCatFilter("all")}
-            className={`px-2.5 py-1 rounded-lg text-xs font-medium transition cursor-pointer ${
-              catFilter === "all" ? "bg-accent/15 text-accent font-semibold border border-accent/30" : "bg-surface text-muted hover:text-foreground border border-border/40"
+            className={`px-2.5 py-1 rounded-xl text-xs font-medium transition cursor-pointer backdrop-blur-sm ${
+              catFilter === "all"
+                ? "bg-accent/15 text-accent font-semibold border border-accent/30"
+                : "bg-surface/60 dark:bg-zinc-900/60 text-muted hover:text-foreground border border-white/10 dark:border-white/5"
             }`}
           >
             {t.categories.title} ({t.common?.all || "Todas"})
@@ -245,10 +254,10 @@ export function HabitsClient({
               key={c.id}
               type="button"
               onClick={() => setCatFilter(catFilter === c.id ? "all" : c.id)}
-              className={`px-2.5 py-1 rounded-lg text-xs font-medium transition flex items-center gap-1.5 cursor-pointer ${
+              className={`px-2.5 py-1 rounded-xl text-xs font-medium transition flex items-center gap-1.5 cursor-pointer backdrop-blur-sm ${
                 catFilter === c.id
                   ? "bg-accent/15 text-accent font-semibold border border-accent/30"
-                  : "bg-surface text-muted hover:text-foreground border border-border/40"
+                  : "bg-surface/60 dark:bg-zinc-900/60 text-muted hover:text-foreground border border-white/10 dark:border-white/5"
               }`}
             >
               <span style={{ color: c.color }}>
@@ -276,10 +285,10 @@ export function HabitsClient({
               key={item.id}
               type="button"
               onClick={() => setTimeFilter(item.id)}
-              className={`px-2.5 py-1 rounded-lg text-xs font-medium transition cursor-pointer ${
+              className={`px-2.5 py-1 rounded-xl text-xs font-medium transition cursor-pointer backdrop-blur-sm ${
                 timeFilter === item.id
                   ? "bg-accent/15 text-accent font-semibold border border-accent/30"
-                  : "bg-surface text-muted hover:text-foreground border border-border/40"
+                  : "bg-surface/60 dark:bg-zinc-900/60 text-muted hover:text-foreground border border-white/10 dark:border-white/5"
               }`}
             >
               {item.label}
@@ -529,89 +538,71 @@ export function HabitsClient({
       )}
 
       {/* Modal: New Habit */}
-      <Modal state={createModal}>
-        <Modal.Backdrop className="bg-background/40 backdrop-blur-md">
-          <Modal.Container placement="center">
-            <Modal.Dialog>
-              <Modal.CloseTrigger />
-              <Modal.Header>
-                <Modal.Heading>{t.habit.new}</Modal.Heading>
-              </Modal.Header>
-              <Modal.Body>
-                <HabitForm
-                  key={formKey}
-                  categories={categories}
-                  habits={habits}
-                  onDone={() => {
-                    createModal.close();
-                    setFormKey((k) => k + 1);
-                  }}
-                />
-              </Modal.Body>
-            </Modal.Dialog>
-          </Modal.Container>
-        </Modal.Backdrop>
-      </Modal>
+      <GlassModal
+        state={createModal}
+        title={t.habit.new}
+        maxWidth="lg"
+      >
+        <HabitForm
+          key={formKey}
+          categories={categories}
+          habits={habits}
+          onDone={() => {
+            createModal.close();
+            setFormKey((k) => k + 1);
+          }}
+        />
+      </GlassModal>
 
       {/* Modal: Edit Habit */}
-      <Modal state={editModal}>
-        <Modal.Backdrop className="bg-background/40 backdrop-blur-md">
-          <Modal.Container placement="center">
-            <Modal.Dialog>
-              <Modal.CloseTrigger />
-              <Modal.Header>
-                <Modal.Heading>{t.habit.edit}</Modal.Heading>
-              </Modal.Header>
-              <Modal.Body>
-                {editing && (
-                  <HabitForm
-                    key={editing.id}
-                    categories={categories}
-                    habits={habits}
-                    initial={editing}
-                    onDone={() => editModal.close()}
-                  />
-                )}
-              </Modal.Body>
-            </Modal.Dialog>
-          </Modal.Container>
-        </Modal.Backdrop>
-      </Modal>
+      <GlassModal
+        state={editModal}
+        title={t.habit.edit}
+        maxWidth="lg"
+      >
+        {editing && (
+          <HabitForm
+            key={editing.id}
+            categories={categories}
+            habits={habits}
+            initial={editing}
+            onDone={() => editModal.close()}
+          />
+        )}
+      </GlassModal>
 
       {/* Modal: New Category */}
-      <Modal state={catCreateModal}>
-        <Modal.Backdrop className="bg-background/40 backdrop-blur-md">
-          <Modal.Container placement="center">
-            <Modal.Dialog className="sm:max-w-[360px]">
-              <CategoryCreateForm
-                key={formKey}
-                defaultColor={categories[0]?.color ?? "#64748B"}
-                onDone={() => {
-                  catCreateModal.close();
-                  setFormKey((k) => k + 1);
-                }}
-              />
-            </Modal.Dialog>
-          </Modal.Container>
-        </Modal.Backdrop>
-      </Modal>
+      <GlassModal
+        state={catCreateModal}
+        title={t.categories.new}
+        icon={<FolderPlus size={18} className="text-accent" />}
+        maxWidth="sm"
+      >
+        <CategoryCreateForm
+          key={formKey}
+          defaultColor={categories[0]?.color ?? "#64748B"}
+          onDone={() => {
+            catCreateModal.close();
+            setFormKey((k) => k + 1);
+          }}
+        />
+      </GlassModal>
 
       {/* Modal: Edit Category */}
-      <Modal state={catEditModal}>
-        <Modal.Backdrop className="bg-background/40 backdrop-blur-md">
-          <Modal.Container placement="center">
-            <Modal.Dialog className="sm:max-w-[360px]">
-              {editingCat && (
-                <CategoryEditForm
-                  key={editingCat.id}
-                  category={editingCat}
-                  onDone={() => catEditModal.close()}
-                />
-              )}
-            </Modal.Dialog>
-          </Modal.Container>
-        </Modal.Backdrop>
-      </Modal>
+      <GlassModal
+        state={catEditModal}
+        title={`${t.categories.edit} “${editingCat?.name}”`}
+        icon={<Pencil size={18} className="text-accent" />}
+        maxWidth="sm"
+      >
+        {editingCat && (
+          <CategoryEditForm
+            key={editingCat.id}
+            category={editingCat}
+            onDone={() => catEditModal.close()}
+          />
+        )}
+      </GlassModal>
     </div>
   );
 }
@@ -634,36 +625,42 @@ function CategoryCreateForm({ defaultColor, onDone }: { defaultColor: string; on
   }
 
   return (
-    <>
-      <Modal.CloseTrigger />
-      <Modal.Header>
-        <Modal.Heading>{t.categories.new}</Modal.Heading>
-      </Modal.Header>
-      <Modal.Body>
-        <form action={handle} className="flex flex-col gap-3">
-          <TextField fullWidth isRequired name="name" autoFocus>
-            <Label>{t.categories.name}</Label>
-            <Input placeholder={t.categories.newPh} maxLength={30} autoComplete="off" spellCheck={false} />
-          </TextField>
-          <IconPicker label={t.categories.icon} />
-          <ColorPicker label={t.habit.color} defaultValue={defaultColor} />
-          {error && (
-            <p aria-live="polite" className="text-sm text-danger">
-              {error}
-            </p>
+    <form action={handle} className="flex flex-col gap-4">
+      <TextField fullWidth isRequired name="name" autoFocus>
+        <Label className="text-xs font-semibold">{t.categories.name}</Label>
+        <Input
+          placeholder={t.categories.newPh}
+          maxLength={30}
+          autoComplete="off"
+          spellCheck={false}
+          className="mt-1 rounded-xl glass-input"
+        />
+      </TextField>
+      <IconPicker label={t.categories.icon} />
+      <ColorPicker label={t.habit.color} defaultValue={defaultColor} />
+      {error && (
+        <p aria-live="polite" className="text-xs text-danger">
+          {error}
+        </p>
+      )}
+      <div className="pt-2 flex justify-end">
+        <Button
+          fullWidth
+          variant="primary"
+          type="submit"
+          isDisabled={pending}
+          className="rounded-xl shadow-xs font-semibold"
+        >
+          {pending ? (
+            <span className="flex items-center gap-2">
+              <Spinner size="sm" color="current" /> {t.categories.saving}
+            </span>
+          ) : (
+            t.categories.add
           )}
-          <Button fullWidth variant="primary" type="submit" isDisabled={pending}>
-            {pending ? (
-              <span className="flex items-center gap-2">
-                <Spinner size="sm" color="current" /> {t.categories.saving}
-              </span>
-            ) : (
-              t.categories.add
-            )}
-          </Button>
-        </form>
-      </Modal.Body>
-    </>
+        </Button>
+      </div>
+    </form>
   );
 }
 
@@ -685,37 +682,40 @@ function CategoryEditForm({ category, onDone }: { category: HabitCategory; onDon
   }
 
   return (
-    <>
-      <Modal.CloseTrigger />
-      <Modal.Header>
-        <Modal.Heading>
-          {t.categories.edit} “{category.name}”
-        </Modal.Heading>
-      </Modal.Header>
-      <Modal.Body>
-        <form action={handle} className="flex flex-col gap-3">
-          <TextField fullWidth isRequired name="name" defaultValue={category.name} autoFocus>
-            <Label>{t.categories.name}</Label>
-            <Input maxLength={30} autoComplete="off" spellCheck={false} />
-          </TextField>
-          <IconPicker label={t.categories.icon} defaultValue={category.icon} />
-          <ColorPicker label={t.habit.color} defaultValue={category.color} />
-          {error && (
-            <p aria-live="polite" className="text-sm text-danger">
-              {error}
-            </p>
+    <form action={handle} className="flex flex-col gap-4">
+      <TextField fullWidth isRequired name="name" defaultValue={category.name} autoFocus>
+        <Label className="text-xs font-semibold">{t.categories.name}</Label>
+        <Input
+          maxLength={30}
+          autoComplete="off"
+          spellCheck={false}
+          className="mt-1 rounded-xl glass-input"
+        />
+      </TextField>
+      <IconPicker label={t.categories.icon} defaultValue={category.icon} />
+      <ColorPicker label={t.habit.color} defaultValue={category.color} />
+      {error && (
+        <p aria-live="polite" className="text-xs text-danger">
+          {error}
+        </p>
+      )}
+      <div className="pt-2 flex justify-end">
+        <Button
+          fullWidth
+          variant="primary"
+          type="submit"
+          isDisabled={pending}
+          className="rounded-xl shadow-xs font-semibold"
+        >
+          {pending ? (
+            <span className="flex items-center gap-2">
+              <Spinner size="sm" color="current" /> {t.categories.saving}
+            </span>
+          ) : (
+            t.categories.save
           )}
-          <Button fullWidth variant="primary" type="submit" isDisabled={pending}>
-            {pending ? (
-              <span className="flex items-center gap-2">
-                <Spinner size="sm" color="current" /> {t.categories.saving}
-              </span>
-            ) : (
-              t.categories.save
-            )}
-          </Button>
-        </form>
-      </Modal.Body>
-    </>
+        </Button>
+      </div>
+    </form>
   );
 }

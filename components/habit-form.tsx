@@ -160,12 +160,16 @@ export function HabitForm({
   return (
     <form action={handle} className="flex flex-col gap-4">
       <TextField fullWidth isRequired name="name" defaultValue={initial?.name ?? ""}>
-        <Label>{t.habit.name}</Label>
-        <Input placeholder={type === "build" ? t.habit.namePhBuild : t.habit.namePhAvoid} spellCheck={false} />
+        <Label className="text-xs font-semibold">{t.habit.name}</Label>
+        <Input
+          placeholder={type === "build" ? t.habit.namePhBuild : t.habit.namePhAvoid}
+          spellCheck={false}
+          className="mt-1 rounded-xl glass-input"
+        />
       </TextField>
 
       <div className="flex flex-col gap-1.5">
-        <span className="text-xs font-medium text-muted">{t.habit.type}</span>
+        <span className="text-xs font-semibold">{t.habit.type}</span>
         <div className="grid grid-cols-2 gap-2" role="group" aria-label={t.habit.type}>
           {(["build", "avoid"] as const).map((k) => (
             <button
@@ -173,10 +177,18 @@ export function HabitForm({
               type="button"
               aria-pressed={type === k}
               onClick={() => setType(k)}
-              className={`rounded-2xl px-3 py-2 text-left transition ${type === k ? "border-accent bg-accent/10" : "bg-surface"}`}
+              className={`rounded-2xl p-3 text-left transition-all cursor-pointer ${
+                type === k
+                  ? "border border-accent bg-accent/20 ring-1 ring-accent/30 shadow-xs"
+                  : "glass-btn"
+              }`}
             >
-              <span className="block text-sm font-semibold">{k === "build" ? t.habit.build : t.habit.avoid}</span>
-              <span className="block text-xs text-muted">{k === "build" ? t.habit.buildHint : t.habit.avoidHint}</span>
+              <span className={`block text-sm font-semibold ${type === k ? "text-accent" : "text-foreground"}`}>
+                {k === "build" ? t.habit.build : t.habit.avoid}
+              </span>
+              <span className="block text-xs text-muted mt-0.5">
+                {k === "build" ? t.habit.buildHint : t.habit.avoidHint}
+              </span>
             </button>
           ))}
         </div>
@@ -198,7 +210,7 @@ export function HabitForm({
       </div>
 
       <div className="flex flex-col gap-1.5">
-        <span className="text-xs font-medium text-muted">{t.habit.color}</span>
+        <span className="text-xs font-semibold">{t.habit.color}</span>
         <div className="grid grid-cols-6 gap-1.5" role="group" aria-label={t.habit.color}>
           {PALETTE_12.map((c) => {
             const sel = shownColor.toUpperCase() === c;
@@ -209,11 +221,13 @@ export function HabitForm({
                 aria-pressed={sel}
                 aria-label={c}
                 onClick={() => { setColor(c); setColorTouched(true); }}
-                className={`flex h-9 items-center justify-center rounded-xl transition ${sel ? "ring-2 ring-offset-2 ring-accent" : "hover:scale-105"}`}
-                style={{ backgroundColor: c + "40" }}
+                className={`flex h-9 items-center justify-center rounded-xl transition-all cursor-pointer ${
+                  sel ? "ring-2 ring-offset-2 ring-accent scale-105" : "hover:scale-105 opacity-85 hover:opacity-100"
+                }`}
+                style={{ backgroundColor: c + "35" }}
               >
                 <span style={{ color: c }}>
-                  {sel ? <Check size={16} strokeWidth={2.5} /> : <span className="h-4 w-4 rounded-full" style={{ backgroundColor: c }} />}
+                  {sel ? <Check size={16} strokeWidth={2.5} /> : <span className="h-4 w-4 rounded-full shadow-xs" style={{ backgroundColor: c }} />}
                 </span>
               </button>
             );
@@ -223,7 +237,7 @@ export function HabitForm({
       </div>
 
       <div className="flex flex-col gap-1.5">
-        <span className="text-xs font-medium text-muted">{t.habit.days}</span>
+        <span className="text-xs font-semibold">{t.habit.days}</span>
         <div className="grid grid-cols-7 gap-1" role="group" aria-label={t.habit.days}>
           {DAYS.map((d, i) => {
             const on = days.includes(d);
@@ -233,7 +247,11 @@ export function HabitForm({
                 type="button"
                 aria-pressed={on}
                 onClick={() => toggleDay(d)}
-                className={`h-9 rounded-xl text-sm font-semibold tabular-nums transition ${on ? "bg-accent text-accent-foreground" : "bg-default text-muted"}`}
+                className={`h-9 rounded-xl text-sm font-semibold tabular-nums transition-all cursor-pointer ${
+                  on
+                    ? "bg-accent text-accent-foreground shadow-xs"
+                    : "glass-btn text-muted hover:text-foreground"
+                }`}
               >
                 {dayLabels[i]}
               </button>
@@ -243,7 +261,7 @@ export function HabitForm({
       </div>
 
       <div className="flex flex-col gap-1.5">
-        <span className="text-xs font-medium text-muted">{t.habit.tracking}</span>
+        <span className="text-xs font-semibold">{t.habit.tracking}</span>
         <div className="grid grid-cols-2 gap-2">
           {(["check", "count"] as const).map((k) => (
             <button
@@ -251,7 +269,11 @@ export function HabitForm({
               type="button"
               aria-pressed={tracking === k}
               onClick={() => setTracking(k)}
-              className={`rounded-2xl px-3 py-2 text-sm font-medium transition ${tracking === k ? "border-accent bg-accent/10" : "bg-surface"}`}
+              className={`rounded-2xl p-3 text-sm font-medium transition-all cursor-pointer ${
+                tracking === k
+                  ? "border border-accent bg-accent/20 ring-1 ring-accent/30 text-accent font-semibold shadow-xs"
+                  : "glass-btn text-muted hover:text-foreground"
+              }`}
             >
               {k === "check" ? t.habit.simple : t.habit.counter}
             </button>
@@ -260,15 +282,19 @@ export function HabitForm({
       </div>
 
       {tracking === "count" && (
-        <div className="flex flex-col gap-3 p-3 rounded-2xl bg-surface/50 border border-border/40">
+        <div className="flex flex-col gap-3 p-3.5 rounded-2xl glass-input">
           <div className="flex flex-col gap-1.5">
-            <span className="text-xs font-medium text-muted">{t.habit.counterMode}</span>
+            <span className="text-xs font-semibold">{t.habit.counterMode}</span>
             <div className="grid grid-cols-2 gap-2">
               <button
                 type="button"
                 aria-pressed={counterMode === "single"}
                 onClick={() => switchCounterMode("single")}
-                className={`rounded-xl px-2.5 py-1.5 text-xs font-medium transition ${counterMode === "single" ? "border-accent bg-accent/15 text-accent font-semibold" : "bg-surface text-muted hover:text-foreground"}`}
+                className={`rounded-xl px-2.5 py-1.5 text-xs font-medium transition-all cursor-pointer ${
+                  counterMode === "single"
+                    ? "border border-accent bg-accent/20 text-accent font-semibold shadow-xs"
+                    : "glass-btn text-muted hover:text-foreground"
+                }`}
               >
                 {t.habit.singleCounter}
               </button>
@@ -276,7 +302,11 @@ export function HabitForm({
                 type="button"
                 aria-pressed={counterMode === "multi"}
                 onClick={() => switchCounterMode("multi")}
-                className={`rounded-xl px-2.5 py-1.5 text-xs font-medium transition ${counterMode === "multi" ? "border-accent bg-accent/15 text-accent font-semibold" : "bg-surface text-muted hover:text-foreground"}`}
+                className={`rounded-xl px-2.5 py-1.5 text-xs font-medium transition-all cursor-pointer ${
+                  counterMode === "multi"
+                    ? "border border-accent bg-accent/20 text-accent font-semibold shadow-xs"
+                    : "glass-btn text-muted hover:text-foreground"
+                }`}
               >
                 {t.habit.multiCounter}
               </button>
@@ -286,25 +316,25 @@ export function HabitForm({
           {counterMode === "single" ? (
             <div className="grid grid-cols-2 gap-3">
               <TextField fullWidth name="target_count" type="number" defaultValue={String(initial?.target_count ?? 8)}>
-                <Label>{t.habit.target}</Label>
-                <Input inputMode="numeric" min={1} />
+                <Label className="text-xs font-semibold">{t.habit.target}</Label>
+                <Input inputMode="numeric" min={1} className="mt-1 rounded-xl glass-input" />
               </TextField>
               <TextField fullWidth name="unit" defaultValue={initial?.unit ?? ""}>
-                <Label>{t.habit.unit}</Label>
-                <Input placeholder={t.habit.unitPh} spellCheck={false} />
+                <Label className="text-xs font-semibold">{t.habit.unit}</Label>
+                <Input placeholder={t.habit.unitPh} spellCheck={false} className="mt-1 rounded-xl glass-input" />
               </TextField>
             </div>
           ) : (
             <div className="flex flex-col gap-2.5">
               <div className="flex flex-col gap-2">
                 {counters.map((c) => (
-                  <div key={c.id} className="flex items-center gap-2 bg-surface p-2 rounded-xl border border-border/30">
+                  <div key={c.id} className="flex items-center gap-2 glass-input p-2 rounded-xl shadow-xs">
                     <input
                       type="text"
                       placeholder={t.habit.counterNamePh}
                       value={c.name}
                       onChange={(e) => handleUpdateCounter(c.id, { name: e.target.value })}
-                      className="flex-1 min-w-0 text-xs h-8 rounded-lg bg-background/60 border border-border/40 px-2.5 outline-none focus:border-accent text-foreground"
+                      className="flex-1 min-w-0 text-xs h-8 rounded-lg bg-white/20 dark:bg-white/[0.06] border border-white/10 px-2.5 outline-none focus:border-accent text-foreground"
                       spellCheck={false}
                     />
                     <input
@@ -313,14 +343,14 @@ export function HabitForm({
                       placeholder={t.habit.counterTarget}
                       value={c.target_count || ""}
                       onChange={(e) => handleUpdateCounter(c.id, { target_count: Math.max(1, parseInt(e.target.value) || 1) })}
-                      className="w-16 shrink-0 text-xs h-8 rounded-lg bg-background/60 border border-border/40 px-2 text-center outline-none focus:border-accent text-foreground tabular-nums"
+                      className="w-16 shrink-0 text-xs h-8 rounded-lg bg-white/20 dark:bg-white/[0.06] border border-white/10 px-2 text-center outline-none focus:border-accent text-foreground tabular-nums"
                     />
                     <input
                       type="text"
                       placeholder={t.habit.counterUnit}
                       value={c.unit ?? ""}
                       onChange={(e) => handleUpdateCounter(c.id, { unit: e.target.value || null })}
-                      className="w-20 shrink-0 text-xs h-8 rounded-lg bg-background/60 border border-border/40 px-2 outline-none focus:border-accent text-foreground"
+                      className="w-20 shrink-0 text-xs h-8 rounded-lg bg-white/20 dark:bg-white/[0.06] border border-white/10 px-2 outline-none focus:border-accent text-foreground"
                       spellCheck={false}
                     />
                     {counters.length > 1 && (
@@ -329,7 +359,7 @@ export function HabitForm({
                         size="sm"
                         variant="ghost"
                         aria-label={t.habit.removeCounter}
-                        className="h-8 w-8 text-danger/70 hover:text-danger hover:bg-danger/10 shrink-0"
+                        className="h-8 w-8 text-danger/70 hover:text-danger hover:bg-danger/10 shrink-0 rounded-lg"
                         onPress={() => handleRemoveCounter(c.id)}
                       >
                         <Trash2 size={14} />
@@ -343,7 +373,7 @@ export function HabitForm({
                 type="button"
                 size="sm"
                 variant="secondary"
-                className="self-start text-xs h-8"
+                className="self-start text-xs h-8 rounded-xl glass-btn"
                 onPress={handleAddCounter}
               >
                 <Plus size={13} className="mr-1" />
@@ -368,10 +398,15 @@ export function HabitForm({
         <input type="hidden" name="next_habit_id" value={nextHabitId || ""} />
       </div>
 
-      {error && <p aria-live="polite" className="text-sm text-danger">{error}</p>}
+      {error && <p aria-live="polite" className="text-xs text-danger">{error}</p>}
 
-      <div className="flex justify-end">
-        <Button variant="primary" type="submit" isDisabled={pending || days.length === 0}>
+      <div className="flex justify-end pt-4 pb-1">
+        <Button
+          variant="primary"
+          type="submit"
+          isDisabled={pending || days.length === 0}
+          className="rounded-xl px-6 shadow-xs font-semibold"
+        >
           {pending ? (
             <span className="flex items-center gap-2"><Spinner size="sm" color="current" />{t.habit.saving}</span>
           ) : initial ? t.habit.update : t.habit.create}
@@ -396,12 +431,12 @@ export function CategoryQuickForm({ onDone }: { onDone?: () => void }) {
   return (
     <form action={handle} className="flex flex-col gap-3">
       <TextField fullWidth isRequired name="name">
-        <Label>{t.categories.name}</Label>
-        <Input placeholder={t.categories.newPh} spellCheck={false} />
+        <Label className="text-xs font-semibold">{t.categories.name}</Label>
+        <Input placeholder={t.categories.newPh} spellCheck={false} className="mt-1 rounded-xl glass-input" />
       </TextField>
       <IconPicker label={t.categories.icon} />
       {error && <p className="text-sm text-danger">{error}</p>}
-      <Button variant="primary" type="submit" isDisabled={pending}>
+      <Button variant="primary" type="submit" isDisabled={pending} className="rounded-xl font-semibold shadow-xs">
         {pending ? <span className="flex items-center gap-2"><Spinner size="sm" color="current" />{t.categories.saving}</span> : t.categories.add}
       </Button>
     </form>

@@ -30,10 +30,10 @@ export function IconPicker({
               aria-pressed={selected}
               aria-label={key}
               onClick={() => setValue(key)}
-              className={`flex h-9 items-center justify-center rounded-xl transition ${
+              className={`flex h-9 items-center justify-center rounded-xl transition-all cursor-pointer ${
                 selected
-                  ? "bg-accent text-accent-foreground"
-                  : "bg-default text-muted hover:text-foreground"
+                  ? "bg-accent text-accent-foreground shadow-xs ring-1 ring-accent/30"
+                  : "bg-surface/60 dark:bg-zinc-900/60 border border-white/10 dark:border-white/5 text-muted hover:text-foreground hover:bg-surface/90"
               }`}
             >
               <CategoryIcon icon={key} size={17} />

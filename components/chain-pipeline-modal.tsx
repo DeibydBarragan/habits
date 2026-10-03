@@ -1,8 +1,9 @@
 "use client";
 
 import { Button } from "@heroui/react";
-import { ArrowRight, Clock, X } from "lucide-react";
+import { ArrowRight, Clock, Workflow } from "lucide-react";
 import { useLang } from "@/components/language";
+import { GlassModal } from "@/components/glass-modal";
 import { CategoryIcon } from "@/components/category-icon";
 import type { Habit, HabitCategory } from "@/lib/types";
 
@@ -29,8 +30,6 @@ export function ChainPipelineModal({
   const { lang, t } = useLang();
   const dayLabels = lang === "es" ? DAYS_SHORT_ES : DAYS_SHORT_EN;
 
-  if (!isOpen) return null;
-
   function formatTime(timeVal?: string | null) {
     if (!timeVal) return null;
     if (timeVal === "morning") return `🌅 ${t.views.morning}`;
@@ -43,46 +42,38 @@ export function ChainPipelineModal({
   const timeLabel = formatTime(chainTime);
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-md animate-in fade-in-0 duration-200">
-      <div
-        className="w-full max-w-4xl max-h-[90vh] rounded-3xl border border-border/70 bg-surface/95 dark:bg-zinc-900/95 backdrop-blur-2xl shadow-2xl p-6 flex flex-col gap-6 overflow-hidden animate-in zoom-in-95 duration-200"
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="pipeline-modal-title"
-      >
-        {/* Header */}
-        <div className="flex items-start justify-between gap-3 border-b border-border/40 pb-4">
-          <div className="flex flex-col gap-1 min-w-0">
-            <div className="flex items-center gap-2.5 flex-wrap">
-              <h2 id="pipeline-modal-title" className="text-xl font-bold text-foreground truncate">
-                {chainName}
-              </h2>
-              {timeLabel && (
-                <span className="inline-flex items-center gap-1 text-xs font-semibold px-2.5 py-0.5 rounded-full bg-accent/15 text-accent border border-accent/30">
-                  <Clock size={11} />
-                  <span>{timeLabel}</span>
-                </span>
-              )}
-            </div>
-            <p className="text-xs text-muted">
-              {t.views.readOnlyPreview} · {habits.length} {t.views.totalHabits}
-            </p>
-          </div>
-
+    <GlassModal
+      isOpen={isOpen}
+      onClose={onClose}
+      maxWidth="4xl"
+      title={chainName}
+      subtitle={`${t.views.readOnlyPreview} · ${habits.length} ${t.views.totalHabits}`}
+      icon={<Workflow size={18} className="text-accent" />}
+      footer={
+        <div className="flex justify-end w-full">
           <Button
-            isIconOnly
+            variant="primary"
             size="sm"
-            variant="ghost"
-            aria-label="Cerrar"
-            className="h-8 w-8 text-muted hover:text-foreground"
+            className="px-5 font-semibold text-xs rounded-xl shadow-xs"
             onPress={onClose}
           >
-            <X size={18} />
+            Entendido
           </Button>
         </div>
+      }
+    >
+      <div className="flex flex-col gap-4">
+        {timeLabel && (
+          <div className="flex items-center gap-2">
+            <span className="inline-flex items-center gap-1.5 text-xs font-semibold px-3 py-1 rounded-full bg-accent/15 text-accent border border-accent/25">
+              <Clock size={12} />
+              <span>{timeLabel}</span>
+            </span>
+          </div>
+        )}
 
         {/* Pipeline Body (Horizontal scroll on desktop, vertical on mobile) */}
-        <div className="flex-1 overflow-x-auto overflow-y-auto py-4 px-2 custom-scrollbar">
+        <div className="w-full overflow-x-auto overflow-y-auto py-2 px-1 custom-scrollbar">
           <div className="flex flex-col md:flex-row items-center md:items-stretch gap-3 md:gap-0 min-w-max">
             {habits.map((h, index) => {
               const isLast = index === habits.length - 1;
@@ -92,7 +83,7 @@ export function ChainPipelineModal({
                 <div key={h.id} className="flex flex-col md:flex-row items-center">
                   {/* Card Node */}
                   <div
-                    className="w-64 lg:w-72 rounded-2xl border border-border/60 bg-surface/90 dark:bg-zinc-900/90 p-4 flex flex-col gap-3 shadow-md select-none transition-all"
+                    className="w-64 lg:w-72 rounded-2xl glass-input p-4 flex flex-col gap-3 shadow-md select-none transition-all hover:border-accent/40"
                     style={{
                       borderLeftColor: h.color,
                       borderLeftWidth: "4px",
@@ -101,7 +92,7 @@ export function ChainPipelineModal({
                     {/* Header */}
                     <div className="flex items-center justify-between gap-2">
                       <span
-                        className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl"
+                        className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl ring-1 ring-black/5 dark:ring-white/10"
                         style={{ backgroundColor: h.color + "30", color: h.color }}
                       >
                         <CategoryIcon icon={cat?.icon ?? "other"} size={18} />
@@ -140,7 +131,7 @@ export function ChainPipelineModal({
                             key={d}
                             className={`text-[9px] font-bold w-3.5 h-3.5 rounded flex items-center justify-center ${
                               h.days_active.includes(d)
-                                ? "bg-accent/20 text-accent"
+                                ? "bg-accent/20 text-accent font-semibold"
                                 : "text-muted/40"
                             }`}
                           >
@@ -154,10 +145,10 @@ export function ChainPipelineModal({
                   {/* Connecting Arrow */}
                   {!isLast && (
                     <div className="flex md:flex-col items-center justify-center py-2 md:py-0 md:px-3 text-muted/60 shrink-0">
-                      <div className="hidden md:flex items-center justify-center w-8 h-8 rounded-full bg-surface border border-border/50 text-accent shadow-xs">
+                      <div className="hidden md:flex items-center justify-center w-8 h-8 rounded-full bg-surface/90 dark:bg-zinc-800/90 backdrop-blur-sm border border-border/50 text-accent shadow-xs">
                         <ArrowRight size={14} />
                       </div>
-                      <div className="flex md:hidden items-center justify-center w-7 h-7 rounded-full bg-surface border border-border/50 text-accent rotate-90 my-1">
+                      <div className="flex md:hidden items-center justify-center w-7 h-7 rounded-full bg-surface/90 dark:bg-zinc-800/90 backdrop-blur-sm border border-border/50 text-accent rotate-90 my-1">
                         <ArrowRight size={13} />
                       </div>
                     </div>
@@ -167,14 +158,7 @@ export function ChainPipelineModal({
             })}
           </div>
         </div>
-
-        {/* Footer */}
-        <div className="flex justify-end border-t border-border/40 pt-4">
-          <Button variant="primary" size="sm" className="px-5 font-semibold text-xs" onPress={onClose}>
-            Entendido
-          </Button>
-        </div>
       </div>
-    </div>
+    </GlassModal>
   );
 }

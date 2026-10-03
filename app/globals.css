@@ -47,7 +47,109 @@ body {
   border-color: rgba(255, 255, 255, 0.2);
 }
 
-/* Scrollbar utilities */
+/* ═══════════════════ GLASSMORPHISM SYSTEM ═══════════════════ */
+
+/* Backdrop overlay — cubre la pantalla detrás del modal */
+.glass-backdrop {
+  background: rgba(0, 0, 0, 0.2);
+  transition: opacity 0.2s ease;
+}
+.dark .glass-backdrop {
+  background: rgba(0, 0, 0, 0.28);
+}
+
+/* Modal / Flashcard container — cristal translúcido con blur real directo */
+.glass-panel {
+  position: relative;
+  border-radius: 1.5rem;
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25),
+              inset 0 1px 0 rgba(255, 255, 255, 0.25);
+  backdrop-filter: blur(32px) saturate(1.6);
+  background: rgba(255, 255, 255, 0.32);
+}
+.dark .glass-panel {
+  border-color: rgba(255, 255, 255, 0.14);
+  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5),
+              inset 0 1px 0 rgba(255, 255, 255, 0.15);
+  background: rgba(22, 24, 32, 0.22);
+}
+
+/* Dropdown popover con glass (SearchableSelect) */
+.glass-dropdown {
+  border-radius: 1rem;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  box-shadow: 0 20px 40px -8px rgba(0, 0, 0, 0.3);
+  backdrop-filter: blur(28px) saturate(1.6);
+  background: rgba(255, 255, 255, 0.48);
+}
+.dark .glass-dropdown {
+  border-color: rgba(255, 255, 255, 0.12);
+  background: rgba(22, 24, 32, 0.45);
+}
+
+/* Input / control dentro de glass modals (sin backdrop-filter para no crear conflicto de Backdrop Roots anidados) */
+.glass-input {
+  background: rgba(255, 255, 255, 0.35);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 0.75rem;
+  transition: all 0.15s ease;
+}
+.glass-input:focus-within {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px color-mix(in oklab, var(--accent) 20%, transparent);
+}
+.dark .glass-input {
+  background: rgba(255, 255, 255, 0.06);
+  border-color: rgba(255, 255, 255, 0.08);
+}
+.dark .glass-input:focus-within {
+  border-color: var(--accent);
+}
+
+/* Botón dentro de glass modals (secondary/ghost) */
+.glass-btn {
+  background: rgba(255, 255, 255, 0.25);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 0.75rem;
+  transition: all 0.15s ease;
+}
+.glass-btn:hover {
+  background: rgba(255, 255, 255, 0.4);
+}
+.dark .glass-btn {
+  background: rgba(255, 255, 255, 0.06);
+  border-color: rgba(255, 255, 255, 0.08);
+}
+.dark .glass-btn:hover {
+  background: rgba(255, 255, 255, 0.12);
+}
+
+/* Píldora / chip seleccionable dentro de glass */
+.glass-pill {
+  background: rgba(255, 255, 255, 0.2);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 9999px;
+  transition: all 0.15s ease;
+}
+.glass-pill[data-selected="true"],
+.glass-pill.glass-pill-active {
+  background: color-mix(in oklab, var(--accent) 25%, transparent);
+  border-color: color-mix(in oklab, var(--accent) 40%, transparent);
+  color: var(--accent);
+}
+.dark .glass-pill {
+  background: rgba(255, 255, 255, 0.05);
+  border-color: rgba(255, 255, 255, 0.06);
+}
+.dark .glass-pill[data-selected="true"],
+.dark .glass-pill.glass-pill-active {
+  background: color-mix(in oklab, var(--accent) 20%, transparent);
+  border-color: color-mix(in oklab, var(--accent) 30%, transparent);
+}
+
+/* ═══════════════════ SCROLLBAR UTILITIES ═══════════════════ */
+
 .no-scrollbar::-webkit-scrollbar {
   display: none;
 }
@@ -61,16 +163,17 @@ body {
   width: 6px;
 }
 .custom-scrollbar::-webkit-scrollbar-track {
-  background: transparent;
+  background: rgba(255, 255, 255, 0.04);
+  border-radius: 9999px;
 }
 .custom-scrollbar::-webkit-scrollbar-thumb {
-  background: rgba(140, 140, 140, 0.25);
+  background: rgba(255, 255, 255, 0.25);
   border-radius: 9999px;
 }
 .custom-scrollbar::-webkit-scrollbar-thumb:hover {
-  background: rgba(140, 140, 140, 0.45);
+  background: rgba(255, 255, 255, 0.45);
 }
 .custom-scrollbar {
   scrollbar-width: thin;
-  scrollbar-color: rgba(140, 140, 140, 0.25) transparent;
+  scrollbar-color: rgba(255, 255, 255, 0.25) transparent;
 }

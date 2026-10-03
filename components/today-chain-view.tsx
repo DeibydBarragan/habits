@@ -21,6 +21,7 @@ type Props = {
   optimisticLogs: Map<string, HabitLog | null>;
   savingHabitIds: Set<string>;
   today: string;
+  selectedDate?: string;
   onMark: (habit: Habit, status: "done" | "missed", count?: number) => void;
   onUnmark: (habitId: string) => void;
   onBump: (habit: Habit, delta: number, counterId?: string) => void;
@@ -99,6 +100,7 @@ export function TodayChainView({
   optimisticLogs,
   savingHabitIds,
   today,
+  selectedDate,
   onMark,
   onUnmark,
   onBump,
@@ -221,6 +223,7 @@ export function TodayChainView({
           optimisticLogs={optimisticLogs}
           savingHabitIds={savingHabitIds}
           today={today}
+          selectedDate={selectedDate ?? today}
           t={t}
           onMark={onMark}
           onUnmark={onUnmark}
@@ -239,6 +242,7 @@ function ChainTrack({
   optimisticLogs,
   savingHabitIds,
   today,
+  selectedDate,
   t,
   onMark,
   onUnmark,
@@ -251,6 +255,7 @@ function ChainTrack({
   optimisticLogs: Map<string, HabitLog | null>;
   savingHabitIds: Set<string>;
   today: string;
+  selectedDate: string;
   t: ReturnType<typeof useLang>["t"];
   onMark: (habit: Habit, status: "done" | "missed", count?: number) => void;
   onUnmark: (habitId: string) => void;
@@ -262,6 +267,7 @@ function ChainTrack({
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const activeNodeRef = useRef<HTMLDivElement>(null);
+  const effectiveDate = selectedDate || today;
 
   // Compute chain streak with same freeze rules as individual habits
   const chainStreak = useMemo(() => {
@@ -275,7 +281,7 @@ function ChainTrack({
       const isSaving = savingHabitIds.has(h.id);
       const log = optimisticLogs.has(h.id)
         ? (optimisticLogs.get(h.id) ?? undefined)
-        : logsByHabit.get(h.id)?.get(today);
+        : logsByHabit.get(h.id)?.get(effectiveDate);
 
       let isDone = log?.status === "done";
       let isMissed = log?.status === "missed";
@@ -295,7 +301,7 @@ function ChainTrack({
         const prevHabit = chain.habits[index - 1];
         const prevLog = optimisticLogs.has(prevHabit.id)
           ? (optimisticLogs.get(prevHabit.id) ?? undefined)
-          : logsByHabit.get(prevHabit.id)?.get(today);
+          : logsByHabit.get(prevHabit.id)?.get(effectiveDate);
         
         let prevDone = prevLog?.status === "done";
         if (prevHabit.counters && prevHabit.counters.length > 0 && prevLog) {
@@ -319,7 +325,7 @@ function ChainTrack({
         isCurrentTarget: isUnlocked && !isDone && !isMissed,
       };
     });
-  }, [chain, savingHabitIds, optimisticLogs, logsByHabit, today]);
+  }, [chain, savingHabitIds, optimisticLogs, logsByHabit, effectiveDate]);
 
   // Find the current active habit in this chain
   const currentTarget = nodeStates.find((n) => n.isCurrentTarget);
@@ -791,7 +797,7 @@ function ChainConnector({
   return (
     <>
       {/* Horizontal connector on Desktop (md+) */}
-      <div className="hidden md:flex items-center px-2 shrink-0 select-none pointer-events-none relative z-20">
+      <div className="hidden md:flex items-center px-2 shrink-0 select-none pointer-events-none relative">
         <div
           className={`h-[2px] w-6 md:w-8 transition-colors duration-300 ${
             isPreviousDone
@@ -815,7 +821,7 @@ function ChainConnector({
       </div>
 
       {/* Vertical connector on Mobile (<md) */}
-      <div className="flex md:hidden flex-col items-center py-2 shrink-0 select-none pointer-events-none relative z-20">
+      <div className="flex md:hidden flex-col items-center py-2 shrink-0 select-none pointer-events-none relative">
         <div
           className={`w-[2px] h-5 transition-colors duration-300 ${
             isPreviousDone

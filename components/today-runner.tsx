@@ -4,20 +4,21 @@ import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore
 import { useRouter } from "next/navigation";
 import { animate, motion, useMotionValue, useTransform } from "framer-motion";
 import { Button, Card, Modal, ProgressBar, Spinner, toast, useOverlayState } from "@heroui/react";
-import { ArrowRight, Check, LayoutList, Minus, Plus, RotateCcw, Workflow, X } from "lucide-react";
+import { ArrowRight, Calendar, Check, ChevronDown, ChevronLeft, ChevronRight, LayoutList, Minus, Plus, RotateCcw, Workflow, X } from "lucide-react";
 import { useLang } from "@/components/language";
 import { CategoryIcon } from "@/components/category-icon";
 import { TodayChainView } from "@/components/today-chain-view";
 import { AppTooltip } from "@/components/app-tooltip";
-import type { Habit, HabitCategory, HabitLog } from "@/lib/types";
+import { type Habit, type HabitCategory, type HabitLog, isHabitActiveOn, shiftDate } from "@/lib/types";
 import { saveLog, bumpCount, clearLog } from "@/actions/logs";
 
 type Props = {
-  habits: Habit[];
+  habits?: Habit[];
   allHabits?: Habit[];
   categories: HabitCategory[];
   logsByHabit: Map<string, Map<string, HabitLog>>;
   today: string;
+  initialDate?: string | null;
   startId?: string | null;
 };
 
@@ -58,16 +59,107 @@ function subscribeToViewMode(callback: () => void) {
   return () => window.removeEventListener("storage", callback);
 }
 
-export function TodayRunner({ habits, allHabits, categories, logsByHabit, today, startId }: Props) {
-  const { t } = useLang();
+function formatDisplayDate(dateISO: string, todayISO: string, lang: string, t: any): string {
+  if (!dateISO) return "";
+  const d = new Date(dateISO + "T12:00:00");
+  const locale = lang === "es" ? "es-ES" : "en-US";
+
+  if (dateISO === todayISO) {
+    const formatter = new Intl.DateTimeFormat(locale, {
+      weekday: "short",
+      day: "numeric",
+      month: "short",
+    });
+    const formatted = formatter.format(d);
+    return `${t.today.title} (${formatted})`;
+  }
+
+  const yesterdayISO = shiftDate(todayISO, -1);
+  if (dateISO === yesterdayISO) {
+    const formatter = new Intl.DateTimeFormat(locale, {
+      weekday: "short",
+      day: "numeric",
+      month: "short",
+    });
+    const formatted = formatter.format(d);
+    return `${t.today.yesterday ?? (lang === "es" ? "Ayer" : "Yesterday")} (${formatted})`;
+  }
+
+  const todayYear = new Date(todayISO + "T12:00:00").getFullYear();
+  const showYear = d.getFullYear() !== todayYear;
+  const formatter = new Intl.DateTimeFormat(locale, {
+    weekday: "short",
+    day: "numeric",
+    month: "short",
+    year: showYear ? "numeric" : undefined,
+  });
+  const formatted = formatter.format(d);
+  return formatted.charAt(0).toUpperCase() + formatted.slice(1);
+}
+
+export function TodayRunner({ habits, allHabits, categories, logsByHabit, today, initialDate, startId }: Props) {
+  const { lang, t } = useLang();
   const router = useRouter();
   const state = useOverlayState({ defaultOpen: !!startId });
+
+  const [selectedDate, setSelectedDate] = useState<string>(() => {
+    if (initialDate && /^\d{4}-\d{2}-\d{2}$/.test(initialDate) && initialDate <= today) {
+      return initialDate;
+    }
+    return today;
+  });
+  const dateInputRef = useRef<HTMLInputElement>(null);
+
+  const handleSelectDate = useCallback((newDate: string) => {
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(newDate)) return;
+    if (newDate > today) return;
+    setSelectedDate(newDate);
+    const url = newDate === today ? "/hoy" : `/hoy?fecha=${newDate}`;
+    window.history.replaceState(null, "", url);
+  }, [today]);
+
+  useEffect(() => {
+    const onPopState = () => {
+      const params = new URLSearchParams(window.location.search);
+      const f = params.get("fecha");
+      if (f && /^\d{4}-\d{2}-\d{2}$/.test(f) && f <= today) {
+        setSelectedDate(f);
+      } else {
+        setSelectedDate(today);
+      }
+    };
+    window.addEventListener("popstate", onPopState);
+    return () => window.removeEventListener("popstate", onPopState);
+  }, [today]);
+
+  const openDatePicker = useCallback(() => {
+    if (dateInputRef.current) {
+      if (typeof (dateInputRef.current as any).showPicker === "function") {
+        try {
+          (dateInputRef.current as any).showPicker();
+          return;
+        } catch {
+          // fallback
+        }
+      }
+      dateInputRef.current.focus();
+      dateInputRef.current.click();
+    }
+  }, []);
+
   const [queue, setQueue] = useState<string[]>(() => (startId ? [startId] : []));
   const [visitedIds, setVisitedIds] = useState<string[]>(() => (startId ? [startId] : []));
   const [savingHabitIds, setSavingHabitIds] = useState<Set<string>>(new Set());
   const [optimisticLogs, setOptimisticLogs] = useState<Map<string, HabitLog | null>>(new Map());
   const [customCounts, setCustomCounts] = useState<Record<string, number>>({});
   const [customSubCounts, setCustomSubCounts] = useState<Record<string, Record<string, number>>>({});
+
+  // Reset local interactive inputs when switching dates
+  useEffect(() => {
+    setCustomCounts({});
+    setCustomSubCounts({});
+    setOptimisticLogs(new Map());
+  }, [selectedDate]);
 
   const storedMode = useSyncExternalStore(subscribeToViewMode, getSavedViewMode, () => "list");
   const [localMode, setLocalMode] = useState<"list" | "chain" | null>(null);
@@ -111,10 +203,40 @@ export function TodayRunner({ habits, allHabits, categories, logsByHabit, today,
   const bgY2 = useTransform(bgDragX, [-240, 0, 240], [10, 20, 10]);
   const bgOpacity2 = useTransform(bgDragX, [-240, 0, 240], [0.85, 0.55, 0.85]);
 
-  const fullHabitsList = allHabits ?? habits;
+  const fullHabitsList = allHabits ?? habits ?? [];
   const allById = useMemo(() => new Map(fullHabitsList.map((h) => [h.id, h])), [fullHabitsList]);
-  const activeIds = useMemo(() => new Set(habits.map((h) => h.id)), [habits]);
-  const byId = useMemo(() => new Map(habits.map((h) => [h.id, h])), [habits]);
+
+  // Active habits for the currently selected date (schedule active or logged on that date)
+  const activeHabits = useMemo(() => {
+    return fullHabitsList.filter((h) => {
+      const isActiveSchedule = isHabitActiveOn(h, selectedDate);
+      const hasLogOnDate = optimisticLogs.get(h.id)?.date === selectedDate
+        ? !!optimisticLogs.get(h.id)
+        : !!logsByHabit.get(h.id)?.get(selectedDate);
+      return isActiveSchedule || hasLogOnDate;
+    });
+  }, [fullHabitsList, selectedDate, optimisticLogs, logsByHabit]);
+
+  const activeIds = useMemo(() => new Set(activeHabits.map((h) => h.id)), [activeHabits]);
+  const byId = useMemo(() => new Map(activeHabits.map((h) => [h.id, h])), [activeHabits]);
+
+  const completedCount = useMemo(() => {
+    return activeHabits.filter((h) => {
+      const l = optimisticLogs.has(h.id)
+        ? optimisticLogs.get(h.id)
+        : logsByHabit.get(h.id)?.get(selectedDate);
+      if (!l) return false;
+      if (l.status !== "done") return false;
+      if (h.counters && h.counters.length > 0) {
+        const counts = l.counts ?? {};
+        return h.counters.every((c) => {
+          const val = counts[c.id] ?? 0;
+          return h.type === "avoid" ? val <= c.target_count : val >= c.target_count;
+        });
+      }
+      return true;
+    }).length;
+  }, [activeHabits, optimisticLogs, logsByHabit, selectedDate]);
 
   const openChain = useCallback((firstId: string) => {
     if (savingHabitIds.has(firstId)) return;
@@ -140,13 +262,13 @@ export function TodayRunner({ habits, allHabits, categories, logsByHabit, today,
       }
 
       // 2. Otherwise, check next active habit in today's list
-      const idx = habits.findIndex((h) => h.id === fromHabit.id);
+      const idx = activeHabits.findIndex((h) => h.id === fromHabit.id);
       if (idx !== -1) {
-        for (let i = idx + 1; i < habits.length; i++) {
-          if (!excludeIds.includes(habits[i].id)) return habits[i];
+        for (let i = idx + 1; i < activeHabits.length; i++) {
+          if (!excludeIds.includes(activeHabits[i].id)) return activeHabits[i];
         }
         for (let i = 0; i < idx; i++) {
-          if (!excludeIds.includes(habits[i].id)) return habits[i];
+          if (!excludeIds.includes(activeHabits[i].id)) return activeHabits[i];
         }
       }
       return undefined;
@@ -156,7 +278,7 @@ export function TodayRunner({ habits, allHabits, categories, logsByHabit, today,
     const next2 = next1 ? getNextAfter(next1, [...visitedIds, next1.id]) : undefined;
 
     return { nextHabit: next1, nextNextHabit: next2 };
-  }, [current, visitedIds, habits, activeIds, allById]);
+  }, [current, visitedIds, activeHabits, activeIds, allById]);
 
   const nextCat = nextHabit ? categories.find((c) => c.id === nextHabit.category_id) : undefined;
   const nextNextCat = nextNextHabit ? categories.find((c) => c.id === nextNextHabit.category_id) : undefined;
@@ -164,7 +286,7 @@ export function TodayRunner({ habits, allHabits, categories, logsByHabit, today,
   const currentOptLog = current
     ? (optimisticLogs.has(current.id)
         ? optimisticLogs.get(current.id)
-        : logsByHabit.get(current.id)?.get(today))
+        : logsByHabit.get(current.id)?.get(selectedDate))
     : undefined;
   const baseCount = currentOptLog?.count ?? 0;
   const localCount = current && customCounts[current.id] !== undefined ? customCounts[current.id] : baseCount;
@@ -178,7 +300,7 @@ export function TodayRunner({ habits, allHabits, categories, logsByHabit, today,
   ) => {
     setSavingHabitIds((prev) => new Set(prev).add(habitId));
 
-    const targetHabit = byId.get(habitId);
+    const targetHabit = byId.get(habitId) || allById.get(habitId);
     let effectiveCounts = counts;
     if (!effectiveCounts && targetHabit?.counters && targetHabit.counters.length > 0) {
       effectiveCounts = {};
@@ -194,7 +316,7 @@ export function TodayRunner({ habits, allHabits, categories, logsByHabit, today,
           id: prev.get(habitId)?.id ?? `opt-${habitId}-${Date.now()}`,
           user_id: targetHabit.user_id,
           habit_id: habitId,
-          date: today,
+          date: selectedDate,
           status,
           count: count ?? (targetHabit.tracking_mode === "count" ? (status === "done" ? (targetHabit.target_count ?? 1) : 0) : null),
           counts: effectiveCounts ?? {},
@@ -205,7 +327,7 @@ export function TodayRunner({ habits, allHabits, categories, logsByHabit, today,
 
     try {
       const fd = new FormData();
-      fd.set("date", today);
+      fd.set("date", selectedDate);
       fd.set("status", status);
       if (count !== undefined) fd.set("count", String(count));
       if (effectiveCounts) fd.set("counts", JSON.stringify(effectiveCounts));
@@ -234,7 +356,7 @@ export function TodayRunner({ habits, allHabits, categories, logsByHabit, today,
         return next;
       });
     }
-  }, [byId, today, t, router]);
+  }, [byId, allById, selectedDate, t, router]);
 
   // Coordinated fluid dismissal for the 3-card stack
   const handleStartDismiss = useCallback((status: "done" | "missed", count?: number) => {
@@ -276,7 +398,7 @@ export function TodayRunner({ habits, allHabits, categories, logsByHabit, today,
       return next;
     });
     try {
-      await clearLog(habitId, today);
+      await clearLog(habitId, selectedDate);
       router.refresh();
     } catch {
       toast.danger(t.errors.saveFail);
@@ -292,12 +414,12 @@ export function TodayRunner({ habits, allHabits, categories, logsByHabit, today,
         return next;
       });
     }
-  }, [today, router, t]);
+  }, [selectedDate, router, t]);
 
   const bumpHabit = useCallback(async (target: Habit, d: number, counterId?: string) => {
     const currentOpt = optimisticLogs.has(target.id)
       ? optimisticLogs.get(target.id)
-      : logsByHabit.get(target.id)?.get(today);
+      : logsByHabit.get(target.id)?.get(selectedDate);
 
     let nextCount: number;
     let nextSubCounts: Record<string, number> = { ...(currentOpt?.counts ?? customSubCounts[target.id] ?? {}) };
@@ -336,7 +458,7 @@ export function TodayRunner({ habits, allHabits, categories, logsByHabit, today,
         id: prev.get(target.id)?.id ?? `opt-${target.id}-${Date.now()}`,
         user_id: target.user_id,
         habit_id: target.id,
-        date: today,
+        date: selectedDate,
         status: isDone ? "done" : "missed",
         count: nextCount,
         counts: nextSubCounts,
@@ -345,7 +467,7 @@ export function TodayRunner({ habits, allHabits, categories, logsByHabit, today,
     });
 
     try {
-      await bumpCount(target.id, today, d, counterId);
+      await bumpCount(target.id, selectedDate, d, counterId);
       router.refresh();
     } catch {
       toast.danger(t.errors.saveFail);
@@ -356,7 +478,7 @@ export function TodayRunner({ habits, allHabits, categories, logsByHabit, today,
         return next;
       });
     }
-  }, [optimisticLogs, logsByHabit, today, customCounts, customSubCounts, router, t]);
+  }, [optimisticLogs, logsByHabit, selectedDate, customCounts, customSubCounts, router, t]);
 
   const bump = useCallback(async (d: number, counterId?: string) => {
     if (!current) return;
@@ -372,168 +494,285 @@ export function TodayRunner({ habits, allHabits, categories, logsByHabit, today,
 
   return (
     <>
-      {/* View selector toolbar */}
-      <div className={`flex items-center justify-end mb-3 w-full ${viewMode === "list" ? "max-w-xl mx-auto" : ""}`}>
-        <div className="flex gap-1" role="group" aria-label="view">
-          <AppTooltip content={t.views.list}>
+      {/* Top Bar: Date Navigator + Actions */}
+      <div className={`flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2.5 mb-3 w-full ${viewMode === "list" ? "max-w-xl mx-auto" : ""}`}>
+        {/* Date Navigator Pill */}
+        <div className="flex items-center gap-1 bg-surface/60 dark:bg-zinc-900/60 backdrop-blur-md border border-white/20 dark:border-white/10 rounded-2xl p-1 shadow-xs">
+          {/* Prev day */}
+          <AppTooltip content={t.today.prevDay}>
             <Button
               isIconOnly
               size="sm"
-              variant={viewMode === "list" ? "primary" : "secondary"}
-              aria-label={t.views.list}
-              onPress={() => changeViewMode("list")}
+              variant="ghost"
+              className="h-8 w-8 rounded-xl text-muted hover:text-foreground"
+              aria-label={t.today.prevDay}
+              onPress={() => handleSelectDate(shiftDate(selectedDate, -1))}
             >
-              <LayoutList size={16} />
+              <ChevronLeft size={16} />
             </Button>
           </AppTooltip>
 
-          <AppTooltip content={t.views.chain}>
+          {/* Center Date Button (opens date picker) */}
+          <AppTooltip content={t.today.pickDate}>
+            <button
+              type="button"
+              onClick={openDatePicker}
+              className="flex items-center gap-2 px-2.5 py-1.5 rounded-xl hover:bg-white/10 dark:hover:bg-white/5 transition-colors cursor-pointer select-none text-left"
+              aria-label={t.today.pickDate}
+            >
+              <Calendar size={15} className={selectedDate === today ? "text-accent" : "text-amber-500"} />
+              <span className="text-sm font-semibold tracking-tight">
+                {formatDisplayDate(selectedDate, today, lang, t)}
+              </span>
+              <ChevronDown size={13} className="text-muted opacity-70" />
+            </button>
+          </AppTooltip>
+
+          {/* Hidden Native Date Input */}
+          <input
+            ref={dateInputRef}
+            type="date"
+            max={today}
+            value={selectedDate}
+            onChange={(e) => {
+              if (e.target.value) {
+                handleSelectDate(e.target.value);
+              }
+            }}
+            className="sr-only"
+            tabIndex={-1}
+            aria-hidden="true"
+          />
+
+          {/* Next day (disabled if selectedDate >= today) */}
+          <AppTooltip content={selectedDate >= today ? "" : t.today.nextDay}>
             <Button
               isIconOnly
               size="sm"
-              variant={viewMode === "chain" ? "primary" : "secondary"}
-              aria-label={t.views.chain}
-              onPress={() => changeViewMode("chain")}
+              variant="ghost"
+              className="h-8 w-8 rounded-xl text-muted hover:text-foreground disabled:opacity-30 disabled:pointer-events-none"
+              aria-label={t.today.nextDay}
+              isDisabled={selectedDate >= today}
+              onPress={() => handleSelectDate(shiftDate(selectedDate, 1))}
             >
-              <Workflow size={16} />
+              <ChevronRight size={16} />
             </Button>
           </AppTooltip>
         </div>
+
+        {/* Right side: Quick "Back to Today" (if past date) + View Mode Buttons */}
+        <div className="flex items-center justify-between sm:justify-end gap-2">
+          {selectedDate !== today && (
+            <Button
+              size="sm"
+              variant="secondary"
+              className="h-9 text-xs font-semibold gap-1.5 rounded-xl px-3 bg-amber-500/10 text-amber-700 dark:text-amber-300 hover:bg-amber-500/20 border border-amber-500/30 backdrop-blur-sm"
+              onPress={() => handleSelectDate(today)}
+            >
+              <RotateCcw size={13} />
+              <span>{t.today.goToToday}</span>
+            </Button>
+          )}
+
+          <div className="flex gap-1 bg-surface/60 dark:bg-zinc-900/60 backdrop-blur-md border border-white/20 dark:border-white/10 rounded-2xl p-1 shadow-xs" role="group" aria-label="view">
+            <AppTooltip content={t.views.list}>
+              <Button
+                isIconOnly
+                size="sm"
+                variant={viewMode === "list" ? "primary" : "ghost"}
+                className={`h-8 w-8 rounded-xl ${viewMode === "list" ? "" : "text-muted hover:text-foreground"}`}
+                aria-label={t.views.list}
+                onPress={() => changeViewMode("list")}
+              >
+                <LayoutList size={16} />
+              </Button>
+            </AppTooltip>
+
+            <AppTooltip content={t.views.chain}>
+              <Button
+                isIconOnly
+                size="sm"
+                variant={viewMode === "chain" ? "primary" : "ghost"}
+                className={`h-8 w-8 rounded-xl ${viewMode === "chain" ? "" : "text-muted hover:text-foreground"}`}
+                aria-label={t.views.chain}
+                onPress={() => changeViewMode("chain")}
+              >
+                <Workflow size={16} />
+              </Button>
+            </AppTooltip>
+          </div>
+        </div>
       </div>
+
+      {/* Notice Banner when viewing a past date */}
+      {selectedDate !== today && (
+        <div className={`flex items-center justify-between gap-2 px-3.5 py-2.5 rounded-2xl bg-amber-500/10 border border-amber-500/25 text-xs text-amber-950 dark:text-amber-200 mb-3 w-full shadow-xs ${viewMode === "list" ? "max-w-xl mx-auto" : ""}`}>
+          <div className="flex items-center gap-2 min-w-0">
+            <Calendar size={15} className="text-amber-600 dark:text-amber-400 shrink-0" />
+            <span className="truncate">
+              {t.today.viewingPast} <strong className="font-semibold">{formatDisplayDate(selectedDate, today, lang, t)}</strong>
+            </span>
+          </div>
+          <div className="flex items-center gap-2 shrink-0">
+            <span className="text-[11px] font-semibold px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-900 dark:text-amber-200 tabular-nums">
+              {completedCount}/{activeHabits.length}
+            </span>
+          </div>
+        </div>
+      )}
 
       {/* Habits View: List or Chain */}
       {viewMode === "list" ? (
         <div className="flex flex-col gap-2 max-w-xl w-full mx-auto">
-          {habits.map((h) => {
-            const isSaving = savingHabitIds.has(h.id);
-            const log = optimisticLogs.has(h.id)
-              ? (optimisticLogs.get(h.id) ?? undefined)
-              : logsByHabit.get(h.id)?.get(today);
-            const c = categories.find((x) => x.id === h.category_id);
-            const currentCount = log?.count ?? 0;
-            const pct = Math.min(100, (currentCount / (h.target_count ?? 1)) * 100);
+          {activeHabits.length === 0 ? (
+            <div className="rounded-2xl border border-dashed border-border bg-surface/50 p-8 text-center w-full">
+              <p className="text-3xl" aria-hidden>🗓️</p>
+              <p className="mt-2 font-medium">{selectedDate === today ? t.today.emptyTitle : t.today.emptyDayTitle}</p>
+              <p className="mt-1 text-sm text-muted">{selectedDate === today ? t.today.emptySub : t.today.emptyDaySub}</p>
+              {selectedDate !== today && (
+                <Button
+                  size="sm"
+                  variant="secondary"
+                  className="mt-4"
+                  onPress={() => handleSelectDate(today)}
+                >
+                  {t.today.goToToday}
+                </Button>
+              )}
+            </div>
+          ) : (
+            activeHabits.map((h) => {
+              const isSaving = savingHabitIds.has(h.id);
+              const log = optimisticLogs.has(h.id)
+                ? (optimisticLogs.get(h.id) ?? undefined)
+                : logsByHabit.get(h.id)?.get(selectedDate);
+              const c = categories.find((x) => x.id === h.category_id);
+              const currentCount = log?.count ?? 0;
+              const pct = Math.min(100, (currentCount / (h.target_count ?? 1)) * 100);
 
-            return (
-              <div
-                key={h.id}
-                className={`rounded-2xl bg-surface relative group overflow-hidden border transition-all ${
-                  isSaving
-                    ? "border-accent/40 shadow-xs pointer-events-none opacity-60 select-none cursor-not-allowed"
-                    : "border-transparent dark:border-border/10 hover:border-border/40 cursor-pointer"
-                }`}
-                onClick={() => {
-                  if (!isSaving) openChain(h.id);
-                }}
-                aria-disabled={isSaving}
-              >
-                <Card.Content className="p-4 relative z-10 pointer-events-none">
-                  <div className="flex items-center gap-3">
-                    <span
-                      className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl transition-transform group-hover:scale-105"
-                      style={{ backgroundColor: h.color + "40", color: h.color }}
-                    >
-                      <CategoryIcon icon={c?.icon ?? "other"} size={19} />
-                    </span>
+              return (
+                <div
+                  key={h.id}
+                  className={`rounded-2xl bg-surface relative group overflow-hidden border transition-all ${
+                    isSaving
+                      ? "border-accent/40 shadow-xs pointer-events-none opacity-60 select-none cursor-not-allowed"
+                      : "border-transparent dark:border-border/10 hover:border-border/40 cursor-pointer"
+                  }`}
+                  onClick={() => {
+                    if (!isSaving) openChain(h.id);
+                  }}
+                  aria-disabled={isSaving}
+                >
+                  <Card.Content className="p-4 pointer-events-none">
+                    <div className="flex items-center gap-3">
+                      <span
+                        className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl transition-transform group-hover:scale-105"
+                        style={{ backgroundColor: h.color + "40", color: h.color }}
+                      >
+                        <CategoryIcon icon={c?.icon ?? "other"} size={19} />
+                      </span>
 
-                    <div className="min-w-0 flex-1">
-                      <p className="truncate text-[15px] font-medium">{h.name}</p>
-                      <p className="mt-0.5 flex items-center gap-1.5 text-xs tabular-nums" aria-live="polite">
+                      <div className="min-w-0 flex-1">
+                        <p className="truncate text-[15px] font-medium">{h.name}</p>
+                        <p className="mt-0.5 flex items-center gap-1.5 text-xs tabular-nums" aria-live="polite">
+                          {isSaving ? (
+                            <span className="inline-flex items-center gap-1.5 font-medium text-accent">
+                              <Spinner size="sm" color="accent" className="w-3 h-3" />
+                              <span>{t.habit.saving}</span>
+                            </span>
+                          ) : log?.status === "done" ? (
+                            <span className="inline-flex items-center gap-1 font-medium text-success">
+                              <Check size={13} strokeWidth={2.5} />
+                              {h.tracking_mode === "count"
+                                ? h.counters && h.counters.length > 0
+                                  ? h.counters.map((cnt) => `${log.count != null ? (log.counts?.[cnt.id] ?? 0) : 0}/${cnt.target_count} ${cnt.name}`).join(" · ")
+                                  : `${log.count ?? 0} ${t.habit.of} ${h.target_count} ${h.unit ?? ""}`
+                                : h.type === "avoid" ? t.habit.clean : t.today.done}
+                            </span>
+                          ) : log?.status === "missed" ? (
+                            <span className="inline-flex items-center gap-1 font-medium text-danger">
+                              <X size={13} strokeWidth={2.5} />
+                              {h.type === "avoid" ? t.habit.relapsed : t.today.missed}
+                            </span>
+                          ) : (
+                            <span className="text-muted">
+                              {h.tracking_mode === "count"
+                                ? h.counters && h.counters.length > 0
+                                  ? h.counters.map((cnt) => `0/${cnt.target_count} ${cnt.name}`).join(" · ")
+                                  : `0 ${t.habit.of} ${h.target_count} ${h.unit ?? ""}`
+                                : t.habit.pendingToday}
+                            </span>
+                          )}
+                        </p>
+                      </div>
+
+                      {/* Actions or Spinner */}
+                      <div className="flex items-center gap-1 pointer-events-auto">
                         {isSaving ? (
-                          <span className="inline-flex items-center gap-1.5 font-medium text-accent">
-                            <Spinner size="sm" color="accent" className="w-3 h-3" />
-                            <span>{t.habit.saving}</span>
-                          </span>
-                        ) : log?.status === "done" ? (
-                          <span className="inline-flex items-center gap-1 font-medium text-success">
-                            <Check size={13} strokeWidth={2.5} />
-                            {h.tracking_mode === "count"
-                              ? h.counters && h.counters.length > 0
-                                ? h.counters.map((cnt) => `${log.count != null ? (log.counts?.[cnt.id] ?? 0) : 0}/${cnt.target_count} ${cnt.name}`).join(" · ")
-                                : `${log.count ?? 0} ${t.habit.of} ${h.target_count} ${h.unit ?? ""}`
-                              : h.type === "avoid" ? t.habit.clean : t.today.done}
-                          </span>
-                        ) : log?.status === "missed" ? (
-                          <span className="inline-flex items-center gap-1 font-medium text-danger">
-                            <X size={13} strokeWidth={2.5} />
-                            {h.type === "avoid" ? t.habit.relapsed : t.today.missed}
-                          </span>
+                          <div className="flex items-center justify-center h-8 w-8 text-accent">
+                            <Spinner size="sm" color="accent" />
+                          </div>
                         ) : (
-                          <span className="text-muted">
-                            {h.tracking_mode === "count"
-                              ? h.counters && h.counters.length > 0
-                                ? h.counters.map((cnt) => `0/${cnt.target_count} ${cnt.name}`).join(" · ")
-                                : `0 ${t.habit.of} ${h.target_count} ${h.unit ?? ""}`
-                              : t.habit.pendingToday}
-                          </span>
-                        )}
-                      </p>
-                    </div>
-
-                    {/* Actions or Spinner */}
-                    <div className="flex items-center gap-1 pointer-events-auto">
-                      {isSaving ? (
-                        <div className="flex items-center justify-center h-8 w-8 text-accent">
-                          <Spinner size="sm" color="accent" />
-                        </div>
-                      ) : (
-                        <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                          <Button
-                            size="sm"
-                            variant="ghost"
-                            className="text-success hover:bg-success/10"
-                            aria-label={t.habit.completeGoal}
-                            onPress={() => markHabit(h, "done")}
-                            isDisabled={isSaving}
-                          >
-                            <Check size={16} strokeWidth={2.5} />
-                          </Button>
-                          <Button
-                            size="sm"
-                            variant="ghost"
-                            className="text-danger hover:bg-danger/10"
-                            aria-label={t.habit.failed}
-                            onPress={() => markHabit(h, "missed", log?.count ?? 0)}
-                            isDisabled={isSaving}
-                          >
-                            <X size={16} strokeWidth={2.5} />
-                          </Button>
-                          {log && (
+                          <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                             <Button
                               size="sm"
                               variant="ghost"
-                              aria-label={t.reports.clear}
-                              onPress={() => unmark(h.id)}
+                              className="text-success hover:bg-success/10"
+                              aria-label={t.habit.completeGoal}
+                              onPress={() => markHabit(h, "done")}
                               isDisabled={isSaving}
                             >
-                              <RotateCcw size={15} />
+                              <Check size={16} strokeWidth={2.5} />
                             </Button>
-                          )}
-                        </div>
-                      )}
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              className="text-danger hover:bg-danger/10"
+                              aria-label={t.habit.failed}
+                              onPress={() => markHabit(h, "missed", log?.count ?? 0)}
+                              isDisabled={isSaving}
+                            >
+                              <X size={16} strokeWidth={2.5} />
+                            </Button>
+                            {log && (
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                aria-label={t.reports.clear}
+                                onPress={() => unmark(h.id)}
+                                isDisabled={isSaving}
+                              >
+                                <RotateCcw size={15} />
+                              </Button>
+                            )}
+                          </div>
+                        )}
+                      </div>
                     </div>
-                  </div>
 
-                  {h.tracking_mode === "count" && (
-                    <ProgressBar value={pct} className="mt-3">
-                      <ProgressBar.Track>
-                        <ProgressBar.Fill style={{ background: h.color, width: `${pct}%` }} />
-                      </ProgressBar.Track>
-                    </ProgressBar>
-                  )}
-                </Card.Content>
-              </div>
-            );
-          })}
+                    {h.tracking_mode === "count" && (
+                      <ProgressBar value={pct} className="mt-3">
+                        <ProgressBar.Track>
+                          <ProgressBar.Fill style={{ background: h.color, width: `${pct}%` }} />
+                        </ProgressBar.Track>
+                      </ProgressBar>
+                    )}
+                  </Card.Content>
+                </div>
+              );
+            })
+          )}
         </div>
       ) : (
         <TodayChainView
-          habits={habits}
+          habits={activeHabits}
           allHabits={fullHabitsList}
           categories={categories}
           logsByHabit={logsByHabit}
           optimisticLogs={optimisticLogs}
           savingHabitIds={savingHabitIds}
           today={today}
+          selectedDate={selectedDate}
           onMark={markHabit}
           onUnmark={unmark}
           onBump={bumpHabit}
@@ -541,11 +780,11 @@ export function TodayRunner({ habits, allHabits, categories, logsByHabit, today,
         />
       )}
 
-      {/* Fluid Flashcard Modal: opaque backdrop without blur, semi-transparent frosted containers */}
+      {/* Fluid Flashcard Modal */}
       <Modal state={state}>
         <Modal.Backdrop
           isDismissable={true}
-          className="bg-black/60 dark:bg-black/75 overflow-x-hidden p-4 flex items-center justify-center transition-opacity duration-200"
+          className="glass-backdrop overflow-x-hidden p-4 flex items-center justify-center transition-opacity duration-200"
         >
           <Modal.Container
             placement="center"
@@ -749,7 +988,7 @@ function SwipeCard({
           onDragCancel?.();
         }
       }}
-      className="relative flex w-full min-h-[280px] flex-col items-center justify-center gap-5 rounded-3xl border border-border/50 bg-background/60 dark:bg-background/50 backdrop-blur-lg p-7 text-center shadow-xl select-none touch-none cursor-grab active:cursor-grabbing !overflow-visible"
+      className="relative flex w-full min-h-[280px] flex-col items-center justify-center gap-5 glass-panel p-7 text-center select-none touch-none cursor-grab active:cursor-grabbing !overflow-visible"
     >
       {/* Sello HECHO / LIMPIO (Derecha) */}
       <motion.div
@@ -802,7 +1041,7 @@ function SwipeCard({
               return (
                 <div
                   key={c.id}
-                  className="flex items-center justify-between gap-2 px-3 py-1.5 rounded-2xl bg-background/50 backdrop-blur-md border border-border/50"
+                  className="flex items-center justify-between gap-2 px-3 py-1.5 rounded-2xl glass-input"
                 >
                   <div className="flex flex-col text-left min-w-0">
                     <span className="text-xs font-semibold truncate text-foreground">{c.name}</span>
@@ -877,7 +1116,7 @@ function SwipeCard({
 
 function SwipeCardStatic({ habit, cat }: { habit: Habit; cat?: HabitCategory }) {
   return (
-    <div className="flex w-full min-h-[280px] flex-col items-center justify-center gap-5 rounded-3xl border border-border/50 bg-background/60 dark:bg-background/50 backdrop-blur-lg p-7 text-center shadow-xl select-none">
+    <div className="flex w-full min-h-[280px] flex-col items-center justify-center gap-5 glass-panel p-7 text-center select-none">
       <span
         className="flex h-18 w-18 items-center justify-center rounded-2xl shadow-xs"
         style={{
@@ -901,14 +1140,14 @@ function SwipeCardStatic({ habit, cat }: { habit: Habit; cat?: HabitCategory }) 
         habit.counters && habit.counters.length > 0 ? (
           <div className="flex flex-col gap-1.5 w-full max-w-xs opacity-60">
             {habit.counters.map((c) => (
-              <div key={c.id} className="flex items-center justify-between px-3 py-1 rounded-xl bg-background/40 border border-border/40 text-xs text-muted">
+              <div key={c.id} className="flex items-center justify-between px-3 py-1 rounded-xl glass-input text-xs text-muted">
                 <span>{c.name}</span>
                 <span>0 / {c.target_count} {c.unit ?? ""}</span>
               </div>
             ))}
           </div>
         ) : (
-          <div className="flex items-center gap-3 py-1.5 px-3 rounded-2xl bg-background/40 backdrop-blur-md border border-border/50 opacity-60">
+          <div className="flex items-center gap-3 py-1.5 px-3 rounded-2xl glass-input opacity-60">
             <Button isIconOnly size="sm" variant="secondary" className="h-8 w-8 rounded-xl" isDisabled>
               <Minus size={15} />
             </Button>

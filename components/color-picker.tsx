@@ -34,13 +34,13 @@ export function ColorPicker({
               aria-pressed={selected}
               aria-label={c}
               onClick={() => setValue(c)}
-              className={`flex h-9 items-center justify-center rounded-xl transition ${
-                selected ? "ring-2 ring-offset-2 ring-accent" : "hover:scale-105"
+              className={`flex h-9 items-center justify-center rounded-xl transition-all cursor-pointer ${
+                selected ? "ring-2 ring-offset-2 ring-accent scale-105" : "hover:scale-105 opacity-85 hover:opacity-100"
               }`}
-              style={{ backgroundColor: c + "40" }}
+              style={{ backgroundColor: c + "35" }}
             >
               <span style={{ color: c }}>
-                {selected ? <Check size={16} strokeWidth={2.5} /> : <span className="h-4 w-4 rounded-full" style={{ backgroundColor: c }} />}
+                {selected ? <Check size={16} strokeWidth={2.5} /> : <span className="h-4 w-4 rounded-full shadow-xs" style={{ backgroundColor: c }} />}
               </span>
             </button>
           );

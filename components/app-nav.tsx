@@ -27,7 +27,7 @@ export function AppNav({
   ];
 
   return (
-    <header className="sticky top-0 z-10 border-b border-border/50 bg-background/60 backdrop-blur-lg ">
+    <header className="sticky top-0 z-40 border-b border-white/15 dark:border-white/10 bg-background/85 dark:bg-background/80 backdrop-blur-xl">
       <div className={`mx-auto flex items-center justify-between px-5 py-3 transition-all duration-300 ${containerClass}`}>
         <span className="text-sm font-semibold tracking-tight" translate="no">
           habits

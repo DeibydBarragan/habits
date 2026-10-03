@@ -224,7 +224,7 @@ export function ReportsClient({
       {/* Top Filter and Select Bar */}
       <FadeIn className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         {/* Toggle Mode: Habits vs Chains */}
-        <div className="flex items-center gap-1 p-1 rounded-2xl bg-surface/80 border border-border/40 w-fit shrink-0">
+        <div className="flex items-center gap-1 p-1 rounded-2xl bg-surface/60 dark:bg-zinc-900/60 backdrop-blur-md border border-white/20 dark:border-white/10 w-fit shrink-0 shadow-xs">
           <button
             type="button"
             onClick={() => setReportMode("habits")}
@@ -281,12 +281,13 @@ export function ReportsClient({
         </div>
 
         {/* Bar vs Pie Chart Switcher */}
-        <div className="flex gap-1 shrink-0" role="group" aria-label="view">
+        <div className="flex gap-1 bg-surface/60 dark:bg-zinc-900/60 backdrop-blur-md border border-white/20 dark:border-white/10 rounded-2xl p-1 shadow-xs shrink-0" role="group" aria-label="view">
           <AppTooltip content={t.chart.bar}>
             <Button
               isIconOnly
               size="sm"
-              variant={view === "bar" ? "primary" : "secondary"}
+              variant={view === "bar" ? "primary" : "ghost"}
+              className={`h-8 w-8 rounded-xl ${view === "bar" ? "" : "text-muted hover:text-foreground"}`}
               aria-label={t.chart.barLabel}
               onPress={() => setView("bar")}
             >
@@ -298,7 +299,8 @@ export function ReportsClient({
             <Button
               isIconOnly
               size="sm"
-              variant={view === "pie" ? "primary" : "secondary"}
+              variant={view === "pie" ? "primary" : "ghost"}
+              className={`h-8 w-8 rounded-xl ${view === "pie" ? "" : "text-muted hover:text-foreground"}`}
               aria-label={t.chart.pieLabel}
               onPress={() => setView("pie")}
             >
