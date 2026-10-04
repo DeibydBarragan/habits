@@ -4,15 +4,15 @@ import { getHabitsData, getUserAndProfile } from "@/lib/queries";
 import { AppShell } from "@/components/app-shell";
 import { ReportsClient } from "@/components/reports-client";
 import { computeHabitStreak } from "@/lib/streak";
-import { toLocalISODate } from "@/lib/types";
 import { FadeIn } from "@/components/animated";
+import { getServerToday } from "@/lib/date-server";
 
 export default async function InformesPage() {
   const { lang, t } = await getDictionary();
   const { user, profile } = await getUserAndProfile();
   if (!user) redirect("/login");
   const { habits, categories, logs, byHabit } = await getHabitsData();
-  const today = toLocalISODate();
+  const today = await getServerToday();
   const streaks: Record<string, any> = {};
   for (const h of habits) {
     const rec: Record<string, "done" | "missed"> = {};

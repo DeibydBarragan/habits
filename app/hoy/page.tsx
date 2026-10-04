@@ -4,14 +4,15 @@ import { getHabitsData, getUserAndProfile } from "@/lib/queries";
 import { AppShell } from "@/components/app-shell";
 import { TodayRunner } from "@/components/today-runner";
 import { FadeIn } from "@/components/animated";
-import { toLocalISODate, isHabitActiveOn } from "@/lib/types";
+import { isHabitActiveOn } from "@/lib/types";
+import { getServerToday } from "@/lib/date-server";
 
 export default async function HoyPage({ searchParams }: { searchParams?: Promise<{ abrir?: string; fecha?: string }> }) {
   const { lang, t } = await getDictionary();
   const { user, profile } = await getUserAndProfile();
   if (!user) redirect("/login");
   const { habits, categories, byHabit } = await getHabitsData();
-  const today = toLocalISODate();
+  const today = await getServerToday();
   const sp = await searchParams;
   const initialDate = (sp?.fecha && /^\d{4}-\d{2}-\d{2}$/.test(sp.fecha) && sp.fecha <= today) ? sp.fecha : today;
   const activeToday = habits.filter((h) => isHabitActiveOn(h, today));

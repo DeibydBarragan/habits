@@ -69,14 +69,27 @@ export type HabitLog = {
   counts?: Record<string, number> | null;
 };
 
-/** 1=lun … 7=dom (ISO). */
+/** 1=lun … 7=dom (ISO). Pure calendar calculation independent of timezone. */
 export function weekdayIso(dateISO: string): number {
-  const d = new Date(dateISO + "T12:00:00");
-  const js = d.getDay(); // 0=dom
+  const [y, m, d] = dateISO.split("-").map(Number);
+  const date = new Date(Date.UTC(y, m - 1, d, 12, 0, 0));
+  const js = date.getUTCDay(); // 0=dom
   return js === 0 ? 7 : js;
 }
 
-export function toLocalISODate(d: Date = new Date()): string {
+export function toLocalISODate(d: Date = new Date(), timeZone?: string): string {
+  if (timeZone) {
+    try {
+      return new Intl.DateTimeFormat("en-CA", {
+        timeZone,
+        year: "numeric",
+        month: "2-digit",
+        day: "2-digit",
+      }).format(d);
+    } catch {
+      // Fallback if invalid timezone string provided
+    }
+  }
   const y = d.getFullYear();
   const m = String(d.getMonth() + 1).padStart(2, "0");
   const day = String(d.getDate()).padStart(2, "0");
@@ -87,8 +100,13 @@ export function isHabitActiveOn(habit: Habit, dateISO: string): boolean {
   return habit.days_active.includes(weekdayIso(dateISO));
 }
 
+/** Adds or subtracts days from a YYYY-MM-DD string, pure calendar arithmetic. */
 export function shiftDate(dateISO: string, days: number): string {
-  const d = new Date(dateISO + "T12:00:00");
-  d.setDate(d.getDate() + days);
-  return toLocalISODate(d);
+  const [y, m, d] = dateISO.split("-").map(Number);
+  const date = new Date(Date.UTC(y, m - 1, d + days, 12, 0, 0));
+  const newY = date.getUTCFullYear();
+  const newM = String(date.getUTCMonth() + 1).padStart(2, "0");
+  const newD = String(date.getUTCDate()).padStart(2, "0");
+  return `${newY}-${newM}-${newD}`;
 }
+

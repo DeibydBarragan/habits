@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState, useTransition } from "react";
+import { useEffect, useMemo, useState, useTransition } from "react";
 import { Button, Card, ProgressBar, Spinner } from "@heroui/react";
 import { BarChart3, Clock, Layers, PieChart, Workflow } from "lucide-react";
 import { useLang } from "@/components/language";
@@ -10,7 +10,7 @@ import { AppTooltip } from "@/components/app-tooltip";
 import { SearchableSelect } from "@/components/searchable-select";
 import { CategoryIcon } from "@/components/category-icon";
 import { buildHabitChains, computeChainStats } from "@/lib/chains";
-import { isHabitActiveOn, type Habit, type HabitCategory, type HabitChain, type HabitLog } from "@/lib/types";
+import { isHabitActiveOn, shiftDate, weekdayIso, toLocalISODate, type Habit, type HabitCategory, type HabitChain, type HabitLog } from "@/lib/types";
 import type { Streak } from "@/lib/streak";
 import { saveLog, clearLog } from "@/actions/logs";
 
@@ -50,9 +50,23 @@ export function ReportsClient({
   logs,
   logsByHabit = new Map(),
   streaks,
-  today,
+  today: initialToday,
 }: Props) {
   const { lang, t } = useLang();
+  const [today, setToday] = useState(initialToday);
+
+  useEffect(() => {
+    const syncToday = () => {
+      const browserToday = toLocalISODate(new Date());
+      if (browserToday !== today) {
+        setToday(browserToday);
+      }
+    };
+    syncToday();
+    const interval = setInterval(syncToday, 30000);
+    return () => clearInterval(interval);
+  }, [today]);
+
   const [reportMode, setReportMode] = useState<"habits" | "chains">("habits");
 
   // All chains
@@ -114,12 +128,9 @@ export function ReportsClient({
     const map = new Map(entries.map((l) => [l.date, l]));
     const created = (h.created_at ?? "2000-01-01").slice(0, 10);
     for (let i = 0; i < 30; i++) {
-      const d = new Date(today + "T12:00:00");
-      d.setDate(d.getDate() - i);
-      const iso = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+      const iso = shiftDate(today, -i);
       if (iso < created) break;
-      const js = d.getDay();
-      const isoW = js === 0 ? 7 : js;
+      const isoW = weekdayIso(iso);
       if (!h.days_active.includes(isoW)) continue;
       const l = map.get(iso);
       if (iso === today && !l) continue; // pendiente hoy

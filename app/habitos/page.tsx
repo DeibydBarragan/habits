@@ -4,14 +4,14 @@ import { getHabitsData, getUserAndProfile } from "@/lib/queries";
 import { AppShell } from "@/components/app-shell";
 import { HabitsClient } from "@/components/habits-client";
 import { computeHabitStreak } from "@/lib/streak";
-import { toLocalISODate } from "@/lib/types";
+import { getServerToday } from "@/lib/date-server";
 
 export default async function HabitosPage() {
   const { lang } = await getDictionary();
   const { user, profile } = await getUserAndProfile();
   if (!user) redirect("/login");
   const { habits, categories, byHabit } = await getHabitsData();
-  const today = toLocalISODate();
+  const today = await getServerToday();
 
   const streaks: Record<string, any> = {};
   for (const h of habits) {

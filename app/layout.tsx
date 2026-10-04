@@ -24,13 +24,28 @@ export const viewport: Viewport = {
   ],
 };
 
-const themeScript = `(function(){try{var t=localStorage.getItem("habits-theme");if(!t){t=window.matchMedia("(prefers-color-scheme: dark)").matches?"dark":"light";}if(t==="dark"){document.documentElement.classList.add("dark");}}catch(e){}})();`;
+const clientInitScript = `(function(){
+  try{
+    var t=localStorage.getItem("habits-theme");
+    if(!t){t=window.matchMedia("(prefers-color-scheme: dark)").matches?"dark":"light";}
+    if(t==="dark"){document.documentElement.classList.add("dark");}
+  }catch(e){}
+  try{
+    var tz=Intl.DateTimeFormat().resolvedOptions().timeZone;
+    if(tz){
+      var match=document.cookie.match(/(?:^|; )user-tz=([^;]*)/);
+      if(!match||decodeURIComponent(match[1])!==tz){
+        document.cookie="user-tz="+encodeURIComponent(tz)+";path=/;max-age=31536000;SameSite=Lax";
+      }
+    }
+  }catch(e){}
+})();`;
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
     <html lang="es" suppressHydrationWarning>
       <head>
-        <Script strategy="beforeInteractive" id="theme-init" dangerouslySetInnerHTML={{ __html: themeScript }} />
+        <Script strategy="beforeInteractive" id="client-init" dangerouslySetInnerHTML={{ __html: clientInitScript }} />
       </head>
       <body className={inter.className}>
         {children}

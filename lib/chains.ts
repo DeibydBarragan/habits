@@ -1,5 +1,5 @@
 import type { Habit, HabitChain, HabitLog } from "@/lib/types";
-import { isHabitActiveOn } from "@/lib/types";
+import { isHabitActiveOn, shiftDate } from "@/lib/types";
 import { computeChainStreak, type Streak } from "@/lib/streak";
 
 /**
@@ -97,14 +97,11 @@ export function computeChainStats(
 ): ChainStats {
   const streak = computeChainStreak(chain.habits, logsByHabit, today);
 
-  const d = new Date(today + "T00:00:00");
   let activeDays = 0;
   let completedDays = 0;
 
   for (let i = 0; i < 30; i++) {
-    const curDate = new Date(d);
-    curDate.setDate(curDate.getDate() - i);
-    const iso = curDate.toISOString().slice(0, 10);
+    const iso = shiftDate(today, -i);
 
     const activeInDay = chain.habits.filter((h) => isHabitActiveOn(h, iso));
     if (activeInDay.length > 0) {

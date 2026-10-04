@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState, useTransition } from "react";
+import { useEffect, useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { Button, Card, Input, Label, Spinner, TextField, toast, useOverlayState } from "@heroui/react";
 import { Clock, Eye, Filter, FolderPlus, Layers, Pencil, Plus, Search, Workflow, X } from "lucide-react";
@@ -16,7 +16,7 @@ import { StreakBadge } from "@/components/streak-badge";
 import { ChainPipelineModal } from "@/components/chain-pipeline-modal";
 import { ChainEditModal } from "@/components/chain-edit-modal";
 import { buildHabitChains, computeChainStats } from "@/lib/chains";
-import type { Habit, HabitCategory, HabitChain, HabitLog } from "@/lib/types";
+import { toLocalISODate, type Habit, type HabitCategory, type HabitChain, type HabitLog } from "@/lib/types";
 import type { Streak } from "@/lib/streak";
 import { deleteHabit } from "@/actions/habits";
 import { createCategory, updateCategory, deleteCategory } from "@/actions/categories";
@@ -43,7 +43,7 @@ export function HabitsClient({
   categories,
   streaks,
   logsByHabit = new Map(),
-  today = new Date().toISOString().slice(0, 10),
+  today: initialToday = toLocalISODate(),
 }: Props) {
   const { t } = useLang();
   const router = useRouter();
@@ -51,6 +51,20 @@ export function HabitsClient({
   const editModal = useOverlayState();
   const catCreateModal = useOverlayState();
   const catEditModal = useOverlayState();
+
+  const [today, setToday] = useState(initialToday);
+
+  useEffect(() => {
+    const syncToday = () => {
+      const browserToday = toLocalISODate(new Date());
+      if (browserToday !== today) {
+        setToday(browserToday);
+      }
+    };
+    syncToday();
+    const interval = setInterval(syncToday, 30000);
+    return () => clearInterval(interval);
+  }, [today]);
 
   const [activeTab, setActiveTab] = useState<"habits" | "chains">("habits");
   const [editing, setEditing] = useState<Habit | null>(null);

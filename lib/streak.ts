@@ -1,4 +1,4 @@
-import type { Habit, HabitLog } from "@/lib/types";
+import { shiftDate, weekdayIso, type Habit, type HabitLog } from "@/lib/types";
 
 export type Streak = {
   current: number;
@@ -9,27 +9,11 @@ export type Streak = {
 };
 
 function nextDayISO(iso: string): string {
-  const d = new Date(iso + "T12:00:00");
-  d.setDate(d.getDate() + 1);
-  return toISO(d);
+  return shiftDate(iso, 1);
 }
 
 function prevDayISO(iso: string): string {
-  const d = new Date(iso + "T12:00:00");
-  d.setDate(d.getDate() - 1);
-  return toISO(d);
-}
-
-function toISO(d: Date): string {
-  const y = d.getFullYear();
-  const m = String(d.getMonth() + 1).padStart(2, "0");
-  const day = String(d.getDate()).padStart(2, "0");
-  return `${y}-${m}-${day}`;
-}
-
-function weekdayIso(dateISO: string): number {
-  const js = new Date(dateISO + "T12:00:00").getDay();
-  return js === 0 ? 7 : js;
+  return shiftDate(iso, -1);
 }
 
 /**

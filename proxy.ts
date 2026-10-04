@@ -52,6 +52,15 @@ export async function proxy(request: NextRequest) {
     return NextResponse.redirect(url);
   }
 
+  const vercelTz = request.headers.get("x-vercel-ip-timezone");
+  if (!request.cookies.get("user-tz") && vercelTz) {
+    supabaseResponse.cookies.set("user-tz", vercelTz, {
+      path: "/",
+      maxAge: 31536000,
+      sameSite: "lax",
+    });
+  }
+
   return supabaseResponse;
 }
 

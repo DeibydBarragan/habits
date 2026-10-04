@@ -9,7 +9,7 @@ import { useLang } from "@/components/language";
 import { CategoryIcon } from "@/components/category-icon";
 import { TodayChainView } from "@/components/today-chain-view";
 import { AppTooltip } from "@/components/app-tooltip";
-import { type Habit, type HabitCategory, type HabitLog, isHabitActiveOn, shiftDate } from "@/lib/types";
+import { type Habit, type HabitCategory, type HabitLog, isHabitActiveOn, shiftDate, toLocalISODate } from "@/lib/types";
 import { saveLog, bumpCount, clearLog } from "@/actions/logs";
 
 type Props = {
@@ -97,17 +97,43 @@ function formatDisplayDate(dateISO: string, todayISO: string, lang: string, t: a
   return formatted.charAt(0).toUpperCase() + formatted.slice(1);
 }
 
-export function TodayRunner({ habits, allHabits, categories, logsByHabit, today, initialDate, startId }: Props) {
+export function TodayRunner({ habits, allHabits, categories, logsByHabit, today: initialToday, initialDate, startId }: Props) {
   const { lang, t } = useLang();
   const router = useRouter();
   const state = useOverlayState({ defaultOpen: !!startId });
 
+  const [today, setToday] = useState(initialToday);
+
   const [selectedDate, setSelectedDate] = useState<string>(() => {
-    if (initialDate && /^\d{4}-\d{2}-\d{2}$/.test(initialDate) && initialDate <= today) {
+    const currentToday = typeof window !== "undefined" ? toLocalISODate(new Date()) : initialToday;
+    if (initialDate && /^\d{4}-\d{2}-\d{2}$/.test(initialDate) && initialDate <= currentToday) {
       return initialDate;
     }
-    return today;
+    return currentToday;
   });
+
+  useEffect(() => {
+    const syncToday = () => {
+      const browserToday = toLocalISODate(new Date());
+      if (browserToday !== today) {
+        setToday(browserToday);
+        setSelectedDate((prev) => (prev === today || prev === initialToday ? browserToday : prev));
+      }
+    };
+    syncToday();
+    const interval = setInterval(syncToday, 30000);
+    const onVisibilityChange = () => {
+      if (document.visibilityState === "visible") {
+        syncToday();
+      }
+    };
+    document.addEventListener("visibilitychange", onVisibilityChange);
+    return () => {
+      clearInterval(interval);
+      document.removeEventListener("visibilitychange", onVisibilityChange);
+    };
+  }, [today, initialToday]);
+
   const dateInputRef = useRef<HTMLInputElement>(null);
 
   const handleSelectDate = useCallback((newDate: string) => {
